@@ -1,19 +1,39 @@
 package com.spud.rpic.cluster;
 
 import com.spud.rpic.model.ServiceURL;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Spud
  * @date 2025/2/9
  */
+@Component
 public class RoundRobinLoadBalancer implements LoadBalancer {
-    private int currentIndex = 0;
+    private final AtomicInteger index = new AtomicInteger(0);
+
     @Override
-    public ServiceURL select(List<ServiceURL> serviceURLs) {
-        ServiceURL serviceURL = serviceURLs.get(currentIndex);
-        currentIndex = (currentIndex + 1) % serviceURLs.size();
-        return serviceURL;
+    public ServiceURL select(List<ServiceURL> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return null;
+        }
+        return urls.get(incrementAndGetModulo(urls.size()));
+    }
+
+    private int incrementAndGetModulo(int modulo) {
+        for (;;) {
+            int current = index.get();
+            int next = (current + 1) % modulo;
+            if (index.compareAndSet(current, next)) {
+                return next;
+            }
+        }
+    }
+
+    @Override
+    public String getType() {
+        return LoadBalancerType.ROUND_ROBIN.getType();
     }
 }

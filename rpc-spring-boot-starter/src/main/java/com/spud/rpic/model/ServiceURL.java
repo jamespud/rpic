@@ -2,30 +2,156 @@ package com.spud.rpic.model;
 
 import lombok.Data;
 
+import java.io.Serializable;
+import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * @author Spud
  * @date 2024/10/13
  */
 @Data
-public class ServiceURL {
+public class ServiceURL implements Serializable {
+    private static final long serialVersionUID = -1L;
 
-    private String serviceId;
+    /**
+     * 主机地址
+     */
+    private String host;
 
-    private String serviceName;
+    /**
+     * 端口号
+     */
+    private int port;
 
-    private String serviceAddress;
+    private transient String serviceKey;
 
-    private String serviceVersion;
+    /**
+     * 接口名称
+     */
+    private String interfaceName;
 
-    private double weight;
+    /**
+     * 协议名称
+     */
+    private String protocol;
 
-    // TODO: 多序列化支持
+    /**
+     * 服务分组
+     */
+    private String group;
 
-    public ServiceURL(String id, String serviceName, String serviceAddress, String serviceVersion, double weight) {
-        this.serviceId = id;
-        this.serviceName = serviceName;
-        this.serviceAddress = serviceAddress;
-        this.serviceVersion = serviceVersion;
+    /**
+     * 服务版本
+     */
+    private String version;
+    
+    /**
+     * 权重
+     */
+    private Integer weight;
+
+    /**
+     * URL参数
+     */
+    private Map<String, String> parameters;
+
+    private static Map<String, ServiceURL> cachedURLs = new ConcurrentHashMap<>(8);
+
+    public ServiceURL(String host, int port, String interfaceName, String protocol, String group, String version, Integer weight, Map<String, String> parameters) {
+        this.host = host;
+        this.port = port;
+        this.interfaceName = interfaceName;
+        this.protocol = protocol;
+        this.group = group;
+        this.version = version;
         this.weight = weight;
+        this.parameters = parameters;
+    }
+
+    /**
+     * 获取服务地址
+     */
+    public String getAddress() {
+        return host + ":" + port;
+    }
+
+    public InetSocketAddress toInetAddress() {
+        return new InetSocketAddress(host, port);
+    }
+
+    /**
+     * 获取参数值
+     */
+    public String getParameter(String key) {
+        return parameters == null ? null : parameters.get(key);
+    }
+
+    /**
+     * 获取参数值，不存在则返回默认值
+     */
+    public String getParameter(String key, String defaultValue) {
+        String value = getParameter(key);
+        return value != null ? value : defaultValue;
+    }
+
+    /**
+     * 添加参数
+     */
+    public void addParameter(String key, String value) {
+        if (parameters == null) {
+            parameters = new HashMap<>();
+        }
+        parameters.put(key, value);
+    }
+
+    /**
+     * 获取服务标识
+     */
+    public String getServiceKey() {
+        if (serviceKey != null) {
+            return serviceKey;
+        }
+        StringBuilder buf = new StringBuilder();
+        if (group != null && !group.isEmpty()) {
+            buf.append(group).append("/");
+        }
+        buf.append(interfaceName);
+        if (version != null && !version.isEmpty()) {
+            buf.append(":").append(version);
+        }
+        serviceKey = buf.toString();
+        return serviceKey;
+    }
+
+    // protocol://host:port/interfaceName?group=xxx&version=xxx&key1=value1&key2=value2
+    @Override
+    public String toString() {
+        StringBuilder buf = new StringBuilder();
+        buf.append(protocol).append("://")
+                .append(host).append(":")
+                .append(port).append("/")
+                .append(interfaceName);
+
+        if (group != null && !group.isEmpty()) {
+            buf.append("?group=").append(group);
+        }
+        if (version != null && !version.isEmpty()) {
+            buf.append(group == null ? "?" : "&");
+            buf.append("version=").append(version);
+        }
+
+        if (parameters != null && !parameters.isEmpty()) {
+            parameters.forEach((key, value) -> {
+                if (!"group".equals(key) && !"version".equals(key)) {
+                    buf.append(group == null && version == null ? "?" : "&");
+                    buf.append(key).append("=").append(value);
+                }
+            });
+        }
+
+        return buf.toString();
     }
 }

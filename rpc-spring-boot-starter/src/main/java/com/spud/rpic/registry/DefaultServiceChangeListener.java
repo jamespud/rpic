@@ -15,9 +15,5 @@ public class DefaultServiceChangeListener implements ServiceChangeListener {
         // 这里可以添加具体的处理逻辑，例如更新本地服务缓存
         // TODO: 实现具体的服务变更逻辑
         System.out.println("Service " + serviceName + " has changed. New service URLs: " + newServiceUrls);
-        // 示例：更新本地服务地址缓存
-        // LocalServiceCache.updateServiceUrls(serviceName, newServiceUrls);
     }
-
-    
 }

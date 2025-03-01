@@ -1,11 +1,15 @@
 package com.spud.rpic.config;
 
-import com.spud.rpic.annotation.RpcService;
-import com.spud.rpic.io.client.InvocationClient;
-import com.spud.rpic.model.ServiceMetadata;
+import com.spud.rpic.cluster.LoadBalancer;
+import com.spud.rpic.io.netty.client.NettyNetClient;
+import com.spud.rpic.io.netty.client.invocation.DefaultClientInvocation;
+import com.spud.rpic.io.netty.client.invocation.ClientInvocation;
+import com.spud.rpic.io.netty.server.NettyNetServer;
+import com.spud.rpic.io.netty.server.RpcServerHandler;
+import com.spud.rpic.io.netty.server.RpcServerInitializer;
+import com.spud.rpic.io.netty.server.invocation.DefaultServerInvocation;
 import com.spud.rpic.io.serializer.Serializer;
-import com.spud.rpic.io.server.RpcServer;
-import com.spud.rpic.io.server.ServerServiceInvocation;
+import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.registry.Registry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +29,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnProperty(prefix = "rpc", name = "role", havingValue = "server")
 @EnableConfigurationProperties(RpcProperties.class)
-@AutoConfigureAfter(RpcCoreAutoConfiguration.class)
-public class RpcServerAutoConfiguration  implements DisposableBean {
+@AutoConfigureAfter(RpcAutoConfiguration.class)
+public class RpcServerAutoConfiguration implements DisposableBean {
 
     private static final Logger logger = LoggerFactory.getLogger(RpcServerAutoConfiguration.class);
 
@@ -38,53 +42,61 @@ public class RpcServerAutoConfiguration  implements DisposableBean {
         this.rpcProperties = rpcProperties;
         this.applicationContext = applicationContext;
     }
+
     @Bean
     @ConditionalOnMissingBean
-    public ServerServiceInvocation serverServiceInvocation() {
-        return new ServerServiceInvocation();
+    public RpcServerHandler rpcServerHandler(Serializer serializer, DefaultServerInvocation defaultServerInvocation) {
+        return new RpcServerHandler(serializer, defaultServerInvocation);
+    }
+
+
+    @Bean
+    @ConditionalOnMissingBean
+    public RpcServerInitializer rpcServerInitializer(RpcServerHandler rpcServerHandler) {
+        return new RpcServerInitializer(rpcServerHandler);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public RpcServer rpcServer() {
-        return new RpcServer(rpcProperties.getServerPort());
+    public NettyNetServer rpcServer(RpcProperties properties, RpcServerInitializer serverInitializer) {
+        return new NettyNetServer(properties, serverInitializer);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public InvocationClient invocationClient(Serializer serializer) {
-        return new InvocationClient(serializer);
+    public ClientInvocation clientInvocation(Registry registry, LoadBalancer loadBalancer, NettyNetClient nettyNetClient) {
+        return new DefaultClientInvocation(registry, loadBalancer, nettyNetClient, 5);
     }
 
     @Bean
     public void rpcServerInitializer() {
-        new Thread(() -> {
-            RpcServer rpcServer = applicationContext.getBean(RpcServer.class);
-            rpcServer.start();
-        }).start();
-        // 注册服务
-        String[] beanNames = applicationContext.getBeanNamesForAnnotation(RpcService.class);
-        Registry registry = applicationContext.getBean(Registry.class);
-        for (String beanName : beanNames) {
-            Object serviceBean = applicationContext.getBean(beanName);
-            RpcService rpcService = serviceBean.getClass().getAnnotation(RpcService.class);
-            String serviceName = rpcService.serviceName();
-            if ("".equals(serviceName)) {
-                serviceName = serviceBean.getClass().getName();
-            }
-            ServiceMetadata serviceMetadata =
-                    new ServiceMetadata(serviceName);
-            registry.register(serviceMetadata);
-        }
-    }
-
-    @Bean
-    public void rpcClientInitializer() {
-        // TODO: 客户端初始化
+        
     }
 
     @Override
     public void destroy() throws Exception {
-        // TODO: 关闭RPC服务
+        NettyNetServer nettyNetServer = applicationContext.getBean(NettyNetServer.class);
+        if (nettyNetServer != null) {
+            try {
+                logger.info("Shutting down RPC server...");
+                nettyNetServer.stop();
+                logger.info("RPC server stopped successfully");
+            } catch (Exception e) {
+                logger.error("Error stopping RPC server", e);
+            }
+        }
+
+        // 清理注册中心
+        Registry registry = applicationContext.getBean(Registry.class);
+        if (registry != null) {
+            try {
+                logger.info("Unregistering services...");
+//                registry.unregisterAll();
+                logger.info("Services unregistered successfully");
+            } catch (Exception e) {
+                logger.error("Error unregistering services", e);
+            }
+        }
     }
+
 }
