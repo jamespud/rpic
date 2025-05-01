@@ -1,0 +1,7 @@
+rpc:
+  role: client
+  registry:
+    type: zookeeper
+    address: localhost:2181
+server:
+  port: 8081
