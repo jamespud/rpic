@@ -15,6 +15,7 @@ import java.util.List;
 import javax.naming.ServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author Spud
@@ -85,5 +86,34 @@ public class DefaultClientInvocation implements ClientInvocation {
     }
     throw new RpcException("Service invocation failed after " + retryTimes + " retries",
         lastException);
+  }
+
+  @Override
+  public CompletableFuture<RpcResponse> invokeAsync(ServiceMetadata metadata, RpcRequest request, int timeout) {
+    CompletableFuture<RpcResponse> future = new CompletableFuture<>();
+
+    try {
+      // 1. 服务发现
+      List<ServiceURL> instances = registry.discover(metadata);
+      if (instances == null || instances.isEmpty()) {
+        future.completeExceptionally(new ServiceNotFoundException(
+            "No available instances for service: " + metadata.getServiceKey()));
+        return future;
+      }
+
+      // 2. 负载均衡
+      List<ServiceURL> triedInstances = new ArrayList<>();
+      ServiceURL selected = loadBalancer.select(instances, triedInstances);
+      if (selected == null) {
+        future.completeExceptionally(new ServiceUnavailableException("No available instance"));
+        return future;
+      }
+
+      // 3. 异步远程调用
+      return netClient.sendAsync(selected, request, timeout);
+    } catch (Exception e) {
+      future.completeExceptionally(new RpcException("Failed to invoke remote service: " + metadata.getServiceId(), e));
+      return future;
+    }
   }
 }

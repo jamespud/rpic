@@ -91,6 +91,7 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
       response.setErrorMsg("Internal server error: " + e.getMessage());
       log.error("Internal server error", e);
     }
+    response.setError(false);
     return response;
   }
 

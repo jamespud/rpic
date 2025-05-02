@@ -78,59 +78,25 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ProtocolMsg msg) throws Exception {
-    log.info("Channel[{}] channelRead0 received message: type={} (hex: 0x{}), contentLength={}, contentStart={}",
-        ctx.channel().id().asShortText(), msg.getType(),
-        Integer.toHexString(msg.getType() & 0xFF), msg.getContentLength(),
-        msg.getContent() != null && msg.getContent().length > 0
-            ? bytesToHex(msg.getContent(), 0, Math.min(10, msg.getContent().length)) + "..."
-            : "empty");
+    log.debug("Received message: type={}, length={}", msg.getType(), msg.getContentLength());
 
     if (msg.getType() == RpcConstants.TYPE_RESPONSE) {
-      log.info("Channel[{}] Received RESPONSE message, calling handleResponse",
-          ctx.channel().id().asShortText());
-      handleResponse(msg);
-    } else if (msg.getType() == RpcConstants.TYPE_HEARTBEAT) {
-      log.info("Channel[{}] Received HEARTBEAT message, sending response",
-          ctx.channel().id().asShortText());
-      handleHeartbeat(ctx, msg);
-    } else {
-      log.warn("Channel[{}] Unexpected message type: {} (hex: 0x{})",
-          ctx.channel().id().asShortText(), msg.getType(),
-          Integer.toHexString(msg.getType() & 0xFF));
-    }
-  }
+      try {
+        RpcResponse response = serializer.deserialize(msg.getContent(), RpcResponse.class);
+        String requestId = response.getRequestId();
 
-  private void handleResponse(ProtocolMsg msg) {
-    try {
-      log.info("Starting to deserialize response from bytes, content length: {}", msg.getContentLength());
-      if (msg.getContent() == null || msg.getContent().length == 0) {
-        log.error("Response content is null or empty");
-        return;
-      }
-
-      // 打印内容的前20个字节，帮助调试
-      log.info("Response content start: {}", bytesToHex(msg.getContent(), 0, Math.min(20, msg.getContent().length)));
-
-      RpcResponse response = serializer.deserialize(msg.getContent(), RpcResponse.class);
-      log.info("Deserialized response for request: {}, response error: {}",
-          response.getRequestId(), response.getError());
-
-      PendingRequest pendingRequest = pendingRequests.remove(response.getRequestId());
-
-      if (pendingRequest != null) {
-        // 取消超时任务
-        if (pendingRequest.timeoutFuture != null) {
-          pendingRequest.timeoutFuture.cancel(false);
+        PendingRequest pendingRequest = pendingRequests.get(requestId);
+        if (pendingRequest != null) {
+          log.debug("Found pending request for response: {}", requestId);
+          pendingRequest.promise.setSuccess(response);
+        } else {
+          log.warn("No pending request found for response: {}", requestId);
         }
-        // 设置响应结果
-        pendingRequest.promise.setSuccess(response);
-        log.info("Successfully completed promise for request: {}", response.getRequestId());
-      } else {
-        log.warn("Received response for unknown request: {}, active requests: {}",
-            response.getRequestId(), pendingRequests.keySet());
+      } catch (Exception e) {
+        log.error("Failed to process response", e);
       }
-    } catch (Exception e) {
-      log.error("Error handling response message: {}", e.getMessage(), e);
+    } else {
+      log.warn("Received unexpected message type: {}", msg.getType());
     }
   }
 
@@ -142,16 +108,19 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    log.error("RpcClientHandler exception in channel: {}", ctx.channel(), cause);
+    log.error("Channel exception: {}", cause.getMessage());
+    if (masterHandler == null) {
+      failAllPromises(cause);
+    }
     ctx.close();
-    // 不要在这里failAllPromises，这会影响其他通道的请求
   }
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) {
-    log.warn("Channel inactive: {}", ctx.channel());
-    this.context = null;
-    // 不要在这里failAllPromises，这会影响其他通道的请求
+    log.debug("Channel inactive: {}", ctx.channel());
+    if (masterHandler == null) {
+      failAllPromises(new RpcException("Channel closed"));
+    }
   }
 
   /**
@@ -174,39 +143,21 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
    * @param timeout   超时时间(毫秒)
    */
   public void addPromise(String requestId, Promise<RpcResponse> promise, EventLoop eventLoop, int timeout) {
-    // 先清理之前可能存在的同ID请求
-    removePromise(requestId);
-
-    ScheduledFuture<?> timeoutFuture = null;
-    try {
-      if (eventLoop != null) {
-        // 创建超时任务
-        timeoutFuture = eventLoop.schedule(() -> {
-          // 使用CAS操作原子性地移除，确保线程安全
-          PendingRequest pendingRequest = pendingRequests.remove(requestId);
-          if (pendingRequest != null) {
-            // 创建自定义超时异常
-            TimeoutException timeoutException = new TimeoutException(
-                "Request timeout after " + timeout + "ms for request: " + requestId);
-
-            // 尝试设置Promise失败状态
-            if (pendingRequest.promise.tryFailure(timeoutException)) {
-              log.warn("Request timeout: {}", requestId);
-            }
-          }
-        }, timeout, TimeUnit.MILLISECONDS);
-      } else {
-        log.warn("Cannot schedule timeout task for request: {}, no EventLoop available", requestId);
-      }
-    } catch (Exception e) {
-      log.error("Failed to schedule timeout task for request: {}", requestId, e);
-      // 如果无法创建超时任务，我们仍继续请求，只是没有超时检查
+    if (eventLoop == null) {
+      log.warn("EventLoop is null, using default timeout");
+      addPromise(requestId, promise, timeout);
+      return;
     }
 
-    // 保存请求信息到并发Map
-    log.debug("Adding promise for request: {}, current pending requests: {}",
-        requestId, pendingRequests.size());
+    ScheduledFuture<?> timeoutFuture = eventLoop.schedule(() -> {
+      if (removePromise(requestId)) {
+        String error = String.format("Request timeout after %dms, requestId: %s", timeout, requestId);
+        promise.tryFailure(new TimeoutException(error));
+      }
+    }, timeout, TimeUnit.MILLISECONDS);
+
     pendingRequests.put(requestId, new PendingRequest(promise, timeoutFuture));
+    log.debug("Added promise for request: {}, timeout: {}ms", requestId, timeout);
   }
 
   /**
@@ -248,7 +199,7 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
    */
   public void failAllPromises(Throwable cause) {
     if (masterHandler != null) {
-      log.warn("Non-master handler attempted to fail all promises, ignoring");
+      log.warn("Non-master handler attempted to fail all promises");
       return;
     }
 
