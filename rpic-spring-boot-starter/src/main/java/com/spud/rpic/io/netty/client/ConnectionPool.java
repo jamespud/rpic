@@ -40,10 +40,16 @@ public class ConnectionPool {
 
   private final Map<InetSocketAddress, AtomicInteger> connectionCounter = new ConcurrentHashMap<>();
 
+  private final RpcClientHandler sharedHandler;
+
+  private final boolean debugMode;
+
   public ConnectionPool(RpcClientProperties clientProperties, RpcClientInitializer initializer) {
     RpcClientProperties.ConnectionPoolProperties poolProperties = clientProperties.getConnectionPoolProperties();
-    acquireTimeout = poolProperties.getAcquireTimeout();
+    this.acquireTimeout = poolProperties.getAcquireTimeout();
     int maxConnections = poolProperties.getMaxConnections();
+    this.sharedHandler = initializer.getSharedHandler();
+    this.debugMode = Boolean.getBoolean("rpc.debug");
 
     // 使用更多的工作线程
     group = new NioEventLoopGroup(clientProperties.getWorkerThreads());
@@ -57,10 +63,7 @@ public class ConnectionPool {
         .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, clientProperties.getConnectTimeout())
         // 增加写缓冲区大小，提高吞吐量
         .option(ChannelOption.SO_SNDBUF, 32 * 1024)
-        .option(ChannelOption.SO_RCVBUF, 32 * 1024)
-        // 允许地址重用
-        .option(ChannelOption.SO_REUSEADDR, true)
-        .handler(initializer);
+        .option(ChannelOption.SO_RCVBUF, 32 * 1024);
 
     poolMap = new AbstractChannelPoolMap<InetSocketAddress, FixedChannelPool>() {
       @Override
@@ -74,16 +77,13 @@ public class ConnectionPool {
 
         return new FixedChannelPool(
             newBootstrap,
-            new RpcChannelPoolHandler(),
+            new RpcChannelPoolHandler(sharedHandler, debugMode),
             ChannelHealthChecker.ACTIVE,
             FixedChannelPool.AcquireTimeoutAction.FAIL,
             acquireTimeout,
             maxConnections,
-            // 增加最大等待获取连接的数量
             maxConnections,
-            // 启用健康检查
             true,
-            // 启用释放健康检查
             true);
       }
     };

@@ -1,10 +1,15 @@
 package com.spud.rpic.io.netty.client;
 
+import com.spud.rpic.io.netty.LoggingChannelHandler;
+import com.spud.rpic.io.netty.ProtocolDecoder;
+import com.spud.rpic.io.netty.ProtocolEncoder;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.util.AttributeKey;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -18,6 +23,15 @@ public class RpcChannelPoolHandler extends AbstractChannelPoolHandler {
 
   private static final int MAX_IDLE_MINUTES = 15;
 
+  private final RpcClientHandler sharedHandler;
+  private final boolean debugMode;
+  private final AtomicInteger handlerCounter = new AtomicInteger(0);
+
+  public RpcChannelPoolHandler(RpcClientHandler sharedHandler, boolean debugMode) {
+    this.sharedHandler = sharedHandler;
+    this.debugMode = debugMode;
+  }
+
   @Override
   public void channelCreated(Channel ch) {
     // 获取远程地址信息
@@ -29,7 +43,23 @@ public class RpcChannelPoolHandler extends AbstractChannelPoolHandler {
       log.debug("Channel not connected yet, cannot get remote address: {}", ch);
     }
 
-    log.debug("Channel created: {}, remote address: {}", ch, remoteAddress);
+    ChannelPipeline pipeline = ch.pipeline();
+
+    // 添加调试日志处理器（如果启用）
+    if (debugMode) {
+      pipeline.addLast("logger", new LoggingChannelHandler("CLIENT", true));
+    }
+
+    // 添加协议编解码器
+    pipeline.addLast("decoder", new ProtocolDecoder());
+    pipeline.addLast("encoder", new ProtocolEncoder());
+
+    // 为每个channel创建独立的handler实例，共享状态
+    String handlerName = "handler-" + handlerCounter.incrementAndGet();
+    RpcClientHandler channelHandler = new RpcClientHandler(sharedHandler.getSerializer(), sharedHandler);
+    pipeline.addLast(handlerName, channelHandler);
+
+    log.debug("Channel created: {}, remote address: {}, handler: {}", ch, remoteAddress, handlerName);
     ch.attr(LAST_ACCESS_TIME).set(System.nanoTime());
   }
 

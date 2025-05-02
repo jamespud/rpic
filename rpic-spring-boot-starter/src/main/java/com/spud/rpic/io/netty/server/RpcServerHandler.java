@@ -87,8 +87,9 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
             ctx.channel().id().asShortText(), request.getRequestId(), request.getMethodName());
 
         RpcResponse response = defaultServerInvocation.handleRequest(request);
-        log.info("Server Channel[{}] Processed request: {}, created response",
-            ctx.channel().id().asShortText(), request.getRequestId());
+        
+        log.info("Server Channel[{}] Processed request: {}, created response {}",
+            ctx.channel().id().asShortText(), request.getRequestId(), response);
 
         byte[] responseBytes = serializer.serialize(response);
         log.info("Server Channel[{}] Serialized response for request: {}, bytes length: {}, start: {}",
