@@ -49,18 +49,16 @@ public class RpcInvocationHandler implements MethodInterceptor {
     ServiceMetadata metadata = buildServiceMetadata();
 
     try {
-      // 4. 执行远程调用
-      RpcResponse response = clientInvocation.invoke(metadata, request, timeout);
-
-      // 5. 处理响应结果
-      if (response.getError()) {
-        throw new RpcException(response.getErrorMsg());
+      // 4. 检查返回类型是否为 CompletableFuture
+      if (method.getReturnType() == java.util.concurrent.CompletableFuture.class) {
+        return handleAsyncCall(metadata, request);
+      } else {
+        // 5. 同步调用
+        return handleSyncCall(metadata, request);
       }
-      return response.getResult();
     } catch (Exception e) {
       log.error("Failed to invoke remote service: {}", metadata.getServiceId(), e);
-      return null;
-//      throw new RpcException("Failed to invoke remote service: " + metadata.getServiceId(), e);
+      throw new RpcException("Failed to invoke remote service: " + metadata.getServiceId(), e);
     }
   }
 
@@ -71,6 +69,21 @@ public class RpcInvocationHandler implements MethodInterceptor {
       throw new RpcException(response.getErrorMsg());
     }
     return response.getResult();
+  }
+
+  private Object handleAsyncCall(ServiceMetadata metadata, RpcRequest request) {
+    try {
+      return clientInvocation.invokeAsync(metadata, request, timeout)
+          .thenApply(response -> {
+            if (response.getError()) {
+              throw new RpcException(response.getErrorMsg());
+            }
+            return response.getResult();
+          });
+    } catch (Exception e) {
+      log.error("Failed to invoke async remote service: {}", metadata.getServiceId(), e);
+      throw new RpcException("Failed to invoke async remote service: " + metadata.getServiceId(), e);
+    }
   }
 
   private Object handleObjectMethod(Object proxy, Method method, Object[] args) {
