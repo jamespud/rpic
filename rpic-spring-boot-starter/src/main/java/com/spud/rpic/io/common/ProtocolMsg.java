@@ -6,88 +6,76 @@ import lombok.Data;
 import lombok.ToString;
 
 /**
- * @author Spud
- * @date 2025/2/9
+ * 基础协议消息，包含头部和消息内容。
  */
 @Data
 @AllArgsConstructor
 @ToString
 public class ProtocolMsg {
 
-  /**
-   * 魔数
-   */
-  private short magicNumber;
+	/**
+	 * 魔数，用于快速校验。
+	 */
+	private byte magicNumber;
 
-  /**
-   * 版本号
-   */
-  private byte version;
+	/**
+	 * 协议版本号。
+	 */
+	private byte version;
 
-  /**
-   * 消息类型
-   */
-  private byte type;
+	/**
+	 * 消息类型。
+	 */
+	private byte type;
 
-  /**
-   * 消息长度
-   */
-  private int contentLength;
+	/**
+	 * 序列化类型编码。
+	 */
+	private byte serializerType;
 
-  /**
-   * 消息体
-   */
-  private byte[] content;
+	/**
+	 * 消息体长度。
+	 */
+	private int contentLength;
 
-  /**
-   * 消息头长度：1(魔数) + 1(版本号) + 1(消息类型) + 4(消息长度) = 7字节
-   */
-  public static final int HEADER_LENGTH = 7;
+	/**
+	 * 消息体内容。
+	 */
+	private byte[] content;
 
-  /**
-   * 最大帧长度
-   */
-  public static final int MAX_FRAME_LENGTH = 8 * 1024 * 1024;
+	/**
+	 * 消息头长度：1(魔数) + 1(版本号) + 1(消息类型) + 1(序列化类型) + 4(内容长度)。
+	 */
+	public static final int HEADER_LENGTH = 1 + 1 + 1 + 1 + 4;
 
-  /**
-   * 创建协议消息
-   * 
-   * @param bytes 消息内容
-   * @param type  消息类型
-   * @return 协议消息
-   */
-  public static ProtocolMsg fromBytes(byte[] bytes, byte type) {
-    return new ProtocolMsg(RpcConstants.PROTOCOL_MAGIC_NUMBER, RpcConstants.PROTOCOL_VERSION,
-        type, bytes.length, bytes);
-  }
+	/**
+	 * 最大片段长度，默认 8MB。
+	 */
+	public static final int MAX_FRAME_LENGTH = 8 * 1024 * 1024;
 
-  /**
-   * 创建请求消息
-   * 
-   * @param bytes 消息内容
-   * @return 请求协议消息
-   */
-  public static ProtocolMsg fromBytes(byte[] bytes) {
-    return fromBytes(bytes, RpcConstants.TYPE_REQUEST);
-  }
+	public static ProtocolMsg fromBytes(byte[] bytes, byte type, byte serializerType) {
+		return new ProtocolMsg(RpcConstants.PROTOCOL_MAGIC_NUMBER, RpcConstants.PROTOCOL_VERSION,
+			type, serializerType, bytes.length, bytes);
+	}
 
-  /**
-   * 创建响应消息
-   * 
-   * @param bytes 消息内容
-   * @return 响应协议消息
-   */
-  public static ProtocolMsg responseFromBytes(byte[] bytes) {
-    return fromBytes(bytes, RpcConstants.TYPE_RESPONSE);
-  }
+	public static ProtocolMsg fromBytes(byte[] bytes, byte serializerType) {
+		return fromBytes(bytes, RpcConstants.TYPE_REQUEST, serializerType);
+	}
 
-  /**
-   * 创建心跳消息
-   * 
-   * @return 心跳协议消息
-   */
-  public static ProtocolMsg heartBeat() {
-    return new ProtocolMsg(RpcConstants.PROTOCOL_MAGIC_NUMBER, RpcConstants.PROTOCOL_VERSION,
-        RpcConstants.TYPE_HEARTBEAT, 0, new byte[0]);
-  }
+	public static ProtocolMsg fromBytes(byte[] bytes) {
+		return fromBytes(bytes, RpcConstants.DEFAULT_SERIALIZER);
+	}
+
+	public static ProtocolMsg responseFromBytes(byte[] bytes, byte serializerType) {
+		return fromBytes(bytes, RpcConstants.TYPE_RESPONSE, serializerType);
+	}
+
+	public static ProtocolMsg responseFromBytes(byte[] bytes) {
+		return responseFromBytes(bytes, RpcConstants.DEFAULT_SERIALIZER);
+	}
+
+	public static ProtocolMsg heartBeat() {
+		return new ProtocolMsg(RpcConstants.PROTOCOL_MAGIC_NUMBER, RpcConstants.PROTOCOL_VERSION,
+			RpcConstants.TYPE_HEARTBEAT, RpcConstants.DEFAULT_SERIALIZER, 0, new byte[0]);
+	}
 }

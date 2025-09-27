@@ -1,6 +1,7 @@
 package com.spud.rpic.io.common;
 
 import com.spud.rpic.io.serializer.Serializer;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -9,12 +10,12 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class ProtocolMsgFactory {
 
-  private final Serializer serializer;
-  private final AtomicLong messageIdGenerator = new AtomicLong(0);
+	private final Serializer serializer;
+	private final AtomicLong messageIdGenerator = new AtomicLong(0);
 
-  public ProtocolMsgFactory(Serializer serializer) {
-    this.serializer = serializer;
-  }
+	public ProtocolMsgFactory(Serializer serializer) {
+		this.serializer = serializer;
+	}
 
 //    /**
 //     * 创建请求消息

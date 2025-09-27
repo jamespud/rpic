@@ -9,12 +9,12 @@ import java.net.UnknownHostException;
  */
 public class NetUtils {
 
-  public static String getLocalHost() {
-    try {
-      return InetAddress.getLocalHost().getHostAddress();
-    } catch (UnknownHostException e) {
-      return "127.0.0.1";
-    }
-  }
-  
+	public static String getLocalHost() {
+		try {
+			return InetAddress.getLocalHost().getHostAddress();
+		} catch (UnknownHostException e) {
+			return "127.0.0.1";
+		}
+	}
+
 }

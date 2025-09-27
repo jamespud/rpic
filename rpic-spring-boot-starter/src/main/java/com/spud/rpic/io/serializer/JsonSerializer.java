@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spud.rpic.common.exception.SerializeException;
+
 import java.io.IOException;
 
 /**
@@ -13,34 +14,34 @@ import java.io.IOException;
  */
 public class JsonSerializer implements Serializer {
 
-  private final ObjectMapper objectMapper;
+	private final ObjectMapper objectMapper;
 
-  public JsonSerializer() {
-    objectMapper = new ObjectMapper();
-    objectMapper.configure(JsonGenerator.Feature.IGNORE_UNKNOWN, true);
-    objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-  }
+	public JsonSerializer() {
+		objectMapper = new ObjectMapper();
+		objectMapper.configure(JsonGenerator.Feature.IGNORE_UNKNOWN, true);
+		objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+	}
 
-  @Override
-  public <T> byte[] serialize(T obj) throws SerializeException {
-    try {
-      return objectMapper.writeValueAsBytes(obj);
-    } catch (JsonProcessingException e) {
-      throw new SerializeException("Error deserializing object", e);
-    }
-  }
+	@Override
+	public <T> byte[] serialize(T obj) throws SerializeException {
+		try {
+			return objectMapper.writeValueAsBytes(obj);
+		} catch (JsonProcessingException e) {
+			throw new SerializeException("Error deserializing object", e);
+		}
+	}
 
-  @Override
-  public <T> T deserialize(byte[] data, Class<T> clz) throws SerializeException {
-    try {
-      return objectMapper.readValue(data, clz);
-    } catch (IOException e) {
-      throw new SerializeException("Error deserializing object", e);
-    }
-  }
+	@Override
+	public <T> T deserialize(byte[] data, Class<T> clz) throws SerializeException {
+		try {
+			return objectMapper.readValue(data, clz);
+		} catch (IOException e) {
+			throw new SerializeException("Error deserializing object", e);
+		}
+	}
 
-  @Override
-  public String getType() {
-    return SerializerType.JSON.getType();
-  }
+	@Override
+	public String getType() {
+		return SerializerType.JSON.getType();
+	}
 }

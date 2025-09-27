@@ -5,13 +5,14 @@ import com.spud.rpic.common.domain.RpcResponse;
 
 /**
  * 服务端调用接口
+ *
  * @author Spud
  * @date 2025/3/1
  */
 public interface ServerInvocation {
 
-  /**
-   * 处理RPC请求
-   */
-  RpcResponse handleRequest(RpcRequest request);
+	/**
+	 * 处理RPC请求
+	 */
+	RpcResponse handleRequest(RpcRequest request);
 }
