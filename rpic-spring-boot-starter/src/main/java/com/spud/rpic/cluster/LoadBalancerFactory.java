@@ -1,9 +1,9 @@
 package com.spud.rpic.cluster;
 
-import org.springframework.stereotype.Component;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import org.springframework.stereotype.Component;
 
 /**
  * @author Spud
@@ -14,10 +14,12 @@ public class LoadBalancerFactory {
 
 	private final Map<String, LoadBalancer> loadBalancerMap = new HashMap<>();
 
-	public LoadBalancerFactory() {
+	public LoadBalancerFactory(EndpointStatsRegistry endpointStatsRegistry) {
 		addLoadBalancer(new RandomLoadBalancer());
 		addLoadBalancer(new RoundRobinLoadBalancer());
 		addLoadBalancer(new WeightedRandomLoadBalancer());
+		addLoadBalancer(new WeightedRoundRobinLoadBalancer());
+		addLoadBalancer(new P2cEwmaLoadBalancer(endpointStatsRegistry));
 	}
 
 	public void addLoadBalancer(LoadBalancer loadBalancer) {

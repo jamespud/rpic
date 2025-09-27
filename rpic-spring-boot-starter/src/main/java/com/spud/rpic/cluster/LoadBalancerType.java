@@ -13,7 +13,8 @@ public enum LoadBalancerType {
 	WEIGHTED_RANDOM("weightedRandom"),
 	WEIGHTED_ROUND_ROBIN("weightedRoundRobin"),
 	LEAST_ACTIVE("leastActive"),
-	CONSISTENT_HASH("consistentHash");
+	CONSISTENT_HASH("consistentHash"),
+	P2C_EWMA("p2c_ewma");
 
 	private final String type;
 

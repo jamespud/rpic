@@ -1,6 +1,13 @@
 package com.spud.rpic.config;
 
 
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+
+import com.spud.rpic.cluster.CircuitBreakerManager;
+import com.spud.rpic.cluster.EndpointStatsRegistry;
 import com.spud.rpic.cluster.LoadBalancer;
 import com.spud.rpic.cluster.LoadBalancerFactory;
 import com.spud.rpic.config.bean.RpcReferenceAnnotationProcessor;
@@ -18,11 +25,8 @@ import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.proxy.CglibProxyFactory;
 import com.spud.rpic.proxy.ProxyFactory;
 import com.spud.rpic.registry.Registry;
+
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
 
 @Slf4j
 public class RpcClientAutoConfiguration implements DisposableBean {
@@ -59,8 +63,20 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public LoadBalancerFactory loadBalancerFactory() {
-		return new LoadBalancerFactory();
+	public EndpointStatsRegistry endpointStatsRegistry(RpcProperties properties) {
+		return new EndpointStatsRegistry(properties.getClient());
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public CircuitBreakerManager circuitBreakerManager(RpcProperties properties) {
+		return new CircuitBreakerManager(properties.getClient());
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public LoadBalancerFactory loadBalancerFactory(EndpointStatsRegistry endpointStatsRegistry) {
+		return new LoadBalancerFactory(endpointStatsRegistry);
 	}
 
 	@Bean
@@ -72,8 +88,11 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 	@Bean
 	@ConditionalOnMissingBean
 	public ClientInvocation clientInvocation(Registry registry, LoadBalancer loadBalancer,
-	                                         NettyNetClient nettyNetClient) {
-		return new DefaultClientInvocation(registry, loadBalancer, nettyNetClient, 5);
+	                                         NettyNetClient nettyNetClient, RpcProperties properties,
+	                                         CircuitBreakerManager circuitBreakerManager,
+	                                         EndpointStatsRegistry endpointStatsRegistry) {
+		return new DefaultClientInvocation(registry, loadBalancer, nettyNetClient,
+			properties.getClient(), circuitBreakerManager, endpointStatsRegistry);
 	}
 
 	@Bean

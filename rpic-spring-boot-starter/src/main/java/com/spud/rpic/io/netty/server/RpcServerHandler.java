@@ -3,6 +3,7 @@ package com.spud.rpic.io.netty.server;
 import com.spud.rpic.common.constants.RpcConstants;
 import com.spud.rpic.common.domain.RpcRequest;
 import com.spud.rpic.common.domain.RpcResponse;
+import com.spud.rpic.common.exception.TimeoutException;
 import com.spud.rpic.io.common.ProtocolMsg;
 import com.spud.rpic.io.netty.server.invocation.DefaultServerInvocation;
 import com.spud.rpic.io.serializer.Serializer;
@@ -49,7 +50,7 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		log.info("Server channelRead called with message of type: {}", msg.getClass().getName());
+		log.debug("Server channelRead called with message of type: {}", msg.getClass().getName());
 		super.channelRead(ctx, msg);
 	}
 
@@ -61,7 +62,7 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, ProtocolMsg msg) throws Exception {
-		log.info("Server Channel[{}] channelRead0 received message: type={} (hex: 0x{}), contentLength={}, contentStart={}",
+		log.debug("Server Channel[{}] channelRead0 received message: type={} (hex: 0x{}), contentLength={}, contentStart={}",
 			ctx.channel().id().asShortText(), msg.getType(),
 			Integer.toHexString(msg.getType() & 0xFF), msg.getContentLength(),
 			msg.getContent() != null && msg.getContent().length > 0
@@ -69,7 +70,7 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 				: "empty");
 
 		if (msg.getType() == RpcConstants.TYPE_REQUEST) {
-			log.info("Server Channel[{}] Received REQUEST message, time: {}",
+			log.debug("Server Channel[{}] Received REQUEST message, time: {}",
 				ctx.channel().id().asShortText(), System.currentTimeMillis());
 
 			Timer.Sample sample = metricsRecorder.startServerSample();
@@ -80,21 +81,39 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 			Serializer activeSerializer = resolveSerializer(msg.getSerializerType());
 			try {
 				// 打印请求字节开头用于调试
-				log.info("Server Request content start: {}",
+				log.debug("Server Request content start: {}",
 					bytesToHex(requestBytes, 0, Math.min(20, requestBytes.length)));
 
 				RpcRequest request = activeSerializer.deserialize(requestBytes, RpcRequest.class);
 				requestHolder[0] = request;
-				log.info("Server Channel[{}] Deserialized request: {}, method: {}",
+				log.debug("Server Channel[{}] Deserialized request: {}, method: {}",
 					ctx.channel().id().asShortText(), request.getRequestId(), request.getMethodName());
+
+				Long deadlineAt = request.getDeadlineAtMillis();
+				if (deadlineAt != null && System.currentTimeMillis() > deadlineAt) {
+					TimeoutException timeoutException = new TimeoutException("Request deadline exceeded before execution");
+					RpcResponse timeoutResponse = RpcResponse.error(request.getRequestId(), timeoutException);
+					byte[] timeoutBytes = activeSerializer.serialize(timeoutResponse);
+					metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(), caller,
+						false, timeoutException, requestBytesLength, timeoutBytes.length);
+					ProtocolMsg timeoutMsg = ProtocolMsg.responseFromBytes(timeoutBytes, activeSerializer.getCode());
+					log.warn("Server Channel[{}] Dropping request {} due to exceeded deadline {} < now {}",
+						ctx.channel().id().asShortText(), request.getRequestId(), deadlineAt, System.currentTimeMillis());
+					ctx.writeAndFlush(timeoutMsg).addListener(future -> {
+						if (!future.isSuccess()) {
+							log.error("Server Channel[{}] Failed to send timeout response for request: {}", ctx.channel().id().asShortText(), request.getRequestId(), future.cause());
+						}
+					});
+					return;
+				}
 
 				RpcResponse response = defaultServerInvocation.handleRequest(request);
 
-				log.info("Server Channel[{}] Processed request: {}, created response {}",
+				log.debug("Server Channel[{}] Processed request: {}, created response {}",
 					ctx.channel().id().asShortText(), request.getRequestId(), response);
 
 				byte[] responseBytes = activeSerializer.serialize(response);
-				log.info("Server Channel[{}] Serialized response for request: {}, bytes length: {}, start: {}",
+				log.debug("Server Channel[{}] Serialized response for request: {}, bytes length: {}, start: {}",
 					ctx.channel().id().asShortText(), request.getRequestId(), responseBytes.length,
 					bytesToHex(responseBytes, 0, Math.min(20, responseBytes.length)));
 				metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(), caller,
@@ -102,18 +121,18 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 				// 使用新的便捷方法创建响应消息
 				ProtocolMsg responseMsg = ProtocolMsg.responseFromBytes(responseBytes, activeSerializer.getCode());
-				log.info("Server Channel[{}] Created response message, type: {} (hex: 0x{}), contentLength: {}",
+				log.debug("Server Channel[{}] Created response message, type: {} (hex: 0x{}), contentLength: {}",
 					ctx.channel().id().asShortText(), responseMsg.getType(),
 					Integer.toHexString(responseMsg.getType() & 0xFF), responseMsg.getContentLength());
 
-				log.info("Server Channel[{}] Sending response to client, request_id: {}, time: {}",
+				log.debug("Server Channel[{}] Sending response to client, request_id: {}, time: {}",
 					ctx.channel().id().asShortText(), request.getRequestId(), System.currentTimeMillis());
 				final String requestIdForLog = request.getRequestId();
 
 				// 添加Listener来确认是否成功发送
 				ctx.writeAndFlush(responseMsg).addListener(future -> {
 					if (future.isSuccess()) {
-						log.info("Server Channel[{}] Successfully sent response for request: {}, time: {}",
+						log.debug("Server Channel[{}] Successfully sent response for request: {}, time: {}",
 							ctx.channel().id().asShortText(), requestIdForLog, System.currentTimeMillis());
 					} else {
 						log.error("Server Channel[{}] Failed to send response for request: {}, error: {}",

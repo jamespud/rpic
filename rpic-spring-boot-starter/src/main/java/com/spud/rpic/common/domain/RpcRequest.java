@@ -1,11 +1,11 @@
 package com.spud.rpic.common.domain;
 
+import java.io.Serializable;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.io.Serializable;
 
 /**
  * @author Spud
@@ -69,6 +69,16 @@ public class RpcRequest implements Serializable {
 	 * 调用超时时间
 	 */
 	private long timeout;
+
+	/**
+	 * 全链路截止时间（毫秒时间戳），超过该时间请求应被丢弃
+	 */
+	private Long deadlineAtMillis;
+
+	/**
+	 * 当前尝试序号（首个请求为1），用于调试与观测
+	 */
+	private Integer attempt;
 
 	/**
 	 * 获取服务标识

@@ -54,6 +54,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 		final String endpoint = endpointOf(serviceURL);
 		final String serviceKey = request.getServiceKey();
 		final String methodName = request.getMethodName();
+		final Integer attempt = request.getAttempt();
+		final boolean retried = attempt != null && attempt > 1;
 
 		Channel channel = null;
 		Promise<RpcResponse> promise = null;
@@ -74,7 +76,7 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 			byte[] requestBytes = clientHandler.getSerializer().serialize(request);
 			byte serializerCode = clientHandler.getSerializer().getCode();
 			PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName, endpoint,
-				requestBytes.length);
+				requestBytes.length, retried, attempt);
 			pendingMetrics.put(requestId, metric);
 
 			requestPromise.addListener(promiseFuture -> {
@@ -91,7 +93,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 						}
 						int responseBytes = clientHandler.pollResponseSize(requestId);
 						metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
-							removed.endpoint, success, cause, removed.requestBytes, responseBytes);
+							removed.endpoint, success, cause, removed.requestBytes, responseBytes,
+							removed.retried, removed.attempt);
 					}
 				} finally {
 					clientHandler.removePromise(requestId);
@@ -114,9 +117,10 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 			PendingClientMetric removed = pendingMetrics.remove(requestId);
 			if (removed != null) {
 				metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
-					removed.endpoint, false, e, removed.requestBytes, -1);
+					removed.endpoint, false, e, removed.requestBytes, -1, removed.retried, removed.attempt);
 			} else {
-				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1,
+					retried, attempt);
 			}
 			throw new TimeoutException("Request timeout after " + timeout + "ms", e);
 		} finally {
@@ -138,6 +142,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 		final String endpoint = endpointOf(serviceUrl);
 		final String serviceKey = request.getServiceKey();
 		final String methodName = request.getMethodName();
+		final Integer attempt = request.getAttempt();
+		final boolean retried = attempt != null && attempt > 1;
 
 		try {
 			if (serviceUrl == null || serviceUrl.getHost() == null || serviceUrl.getHost().isEmpty()) {
@@ -160,7 +166,7 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 					byte[] requestBytes = clientHandler.getSerializer().serialize(request);
 					byte serializerCode = clientHandler.getSerializer().getCode();
 					PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName, endpoint,
-						requestBytes.length);
+						requestBytes.length, retried, attempt);
 					pendingMetrics.put(requestId, metric);
 
 					promise.addListener(promiseFuture -> {
@@ -177,7 +183,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 								}
 								int responseBytes = clientHandler.pollResponseSize(requestId);
 								metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
-									removed.endpoint, success, cause, removed.requestBytes, responseBytes);
+									removed.endpoint, success, cause, removed.requestBytes, responseBytes,
+									removed.retried, removed.attempt);
 							}
 
 							if (promiseFuture.isSuccess()) {
@@ -207,9 +214,11 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 					PendingClientMetric removed = pendingMetrics.remove(requestId);
 					if (removed != null) {
 						metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
-							removed.endpoint, false, e, removed.requestBytes, -1);
+							removed.endpoint, false, e, removed.requestBytes, -1,
+							removed.retried, removed.attempt);
 					} else {
-						metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+						metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1,
+							retried, attempt);
 					}
 					future.completeExceptionally(e);
 					connectionPool.releaseChannel(serviceUrl, channel);
@@ -217,13 +226,15 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 			}).exceptionally(e -> {
 				log.error("Failed to acquire channel for async request: {}", requestId, e);
 				RpcException error = new RpcException("Failed to acquire channel", e);
-				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1);
+				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1,
+					retried, attempt);
 				future.completeExceptionally(error);
 				return null;
 			});
 		} catch (Exception e) {
 			log.error("Failed to send async request: {}", requestId, e);
-			metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+			metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1,
+				retried, attempt);
 			future.completeExceptionally(e);
 		}
 
@@ -256,13 +267,18 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 		final String methodName;
 		final String endpoint;
 		final long requestBytes;
+		final boolean retried;
+		final Integer attempt;
 
-		PendingClientMetric(Timer.Sample sample, String serviceKey, String methodName, String endpoint, long requestBytes) {
+		PendingClientMetric(Timer.Sample sample, String serviceKey, String methodName, String endpoint, long requestBytes,
+			boolean retried, Integer attempt) {
 			this.sample = sample;
 			this.serviceKey = serviceKey != null ? serviceKey : "unknown";
 			this.methodName = methodName != null ? methodName : "unknown";
 			this.endpoint = endpoint != null ? endpoint : "unknown";
 			this.requestBytes = requestBytes;
+			this.retried = retried;
+			this.attempt = attempt;
 		}
 	}
 }
