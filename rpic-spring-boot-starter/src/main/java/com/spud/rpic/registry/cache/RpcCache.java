@@ -9,13 +9,13 @@ import java.util.function.Function;
  */
 public interface RpcCache<K, V> {
 
-  V get(K key, Function<K, V> loader);
+	V get(K key, Function<K, V> loader);
 
-  void put(K key, V value);
+	void put(K key, V value);
 
-  void invalidate(K key);
+	void invalidate(K key);
 
-  void invalidateAll();
+	void invalidateAll();
 
-  ConcurrentMap<K, V> asMap();
+	ConcurrentMap<K, V> asMap();
 }

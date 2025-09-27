@@ -106,3 +106,20 @@
 4. 从注册中心发现服务地址，选择一个实例
 5. 发送请求到服务实例并等待响应
 6. 处理响应结果（成功返回结果，失败抛出异常）
+
+### 五、观测性（Metrics）
+
+启用 Micrometer（如 Spring Boot Actuator + Prometheus）后，框架会自动输出以下指标，所有指标默认携带 `service`、`method`（可按配置关闭高基数）、以及 `success` 等标签：
+
+| 指标名称 | 说明 | 标签补充 |
+| --- | --- | --- |
+| `rpic.client.latency` | 客户端调用耗时直方图 | `endpoint` = 目标节点 |
+| `rpic.client.requests` / `rpic.client.errors` | 客户端请求总数 / 失败总数 | `error` = 异常类型（失败时） |
+| `rpic.client.request.bytes` / `rpic.client.response.bytes` | 客户端请求/响应负载大小 | - |
+| `rpic.client.pool.acquire` / `rpic.client.pool.acquire.errors` | 连接池获取成功/失败次数 | `endpoint` |
+| `rpic.client.pool.active` | 每个节点的活动连接数 Gauge | `endpoint` |
+| `rpic.server.latency` | 服务端处理耗时直方图 | `caller` = 调用方地址 |
+| `rpic.server.requests` / `rpic.server.errors` | 服务端请求总数 / 失败总数 | `error` |
+| `rpic.server.request.bytes` / `rpic.server.response.bytes` | 服务端接收/发送负载大小 | - |
+
+> 提示：可通过 `rpc.metrics.enabled=false` 关闭指标；`rpc.metrics.high-cardinality-tags-enabled=false` 可避免方法级高基数标签。

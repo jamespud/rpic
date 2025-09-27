@@ -11,59 +11,91 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
 @Data
 @ConfigurationProperties(prefix = "rpc")
 public class RpcProperties {
-  
-  private String role = "client";
 
-  /**
-   * 应用名称
-   */
-  private String applicationName = "rpc-application";
+	private String role = "client";
 
-  /**
-   * 序列化类型
-   */
-  private String serializeType = "json";
+	/**
+	 * 应用名称
+	 */
+	private String applicationName = "rpc-application";
 
-  /**
-   * 压缩类型
-   */
-  private String compressType = "none";
+	/**
+	 * 序列化类型
+	 */
+	private String serializeType = "kryo";
 
-  /**
-   * 注册中心配置
-   */
-  private RegistryConfig registry = new RegistryConfig();
+	/**
+	 * 压缩类型
+	 */
+	private String compressType = "none";
 
-  @NestedConfigurationProperty
-  private RpcServerProperties server = new RpcServerProperties();
+	/**
+	 * 注册中心配置
+	 */
+	private RegistryConfig registry = new RegistryConfig();
 
-  @NestedConfigurationProperty
-  private RpcClientProperties client = new RpcClientProperties();
+	@NestedConfigurationProperty
+	private RpcServerProperties server = new RpcServerProperties();
 
-  @Data
-  public static class RegistryConfig {
+	@NestedConfigurationProperty
+	private RpcClientProperties client = new RpcClientProperties();
 
-    /**
-     * 注册中心类型(nacos, zookeeper)
-     */
-    private String type = "nacos";
+	@NestedConfigurationProperty
+	private MetricsProperties metrics = new MetricsProperties();
 
-    /**
-     * 注册中心地址
-     */
-    private String address = "localhost:8848";
+	@Data
+	public static class RegistryConfig {
 
-    /**
-     * 注册超时时间
-     */
-    private int timeout = 3000;
+		/**
+		 * 注册中心类型(nacos, zookeeper)
+		 */
+		private String type = "nacos";
 
-    // 注册缓存配置
-    private long registrationTtl = 30;  // 分钟
-    private long registrationRefresh = 15;  // 分钟
+		/**
+		 * 注册中心地址
+		 */
+		private String address = "localhost:8848";
 
-    // 发现缓存配置
-    private long discoveryTtl = 30;  // 秒
-    private long discoveryRefresh = 15;  // 秒
-  }
+		/**
+		 * 注册超时时间
+		 */
+		private int timeout = 3000;
+
+		// 注册缓存配置
+		private long registrationTtl = 30;  // 分钟
+		private long registrationRefresh = 15;  // 分钟
+
+		// 发现缓存配置
+		private long discoveryTtl = 30;  // 秒
+		private long discoveryRefresh = 15;  // 秒
+	}
+
+	@Data
+	public static class MetricsProperties {
+
+		/**
+		 * 指标是否启用
+		 */
+		private boolean enabled = true;
+
+		/**
+		 * 百分位统计
+		 */
+		private double[] percentiles = new double[]{0.5, 0.9, 0.95, 0.99};
+
+		/**
+		 * SLA 边界 (毫秒)
+		 */
+		private long[] slaMs = new long[]{1, 5, 10, 20, 50, 100, 200, 500};
+
+		/**
+		 * 是否启用直方图
+		 */
+		private boolean histogram = true;
+
+		/**
+		 * 是否开启高基数标签
+		 */
+		private boolean highCardinalityTagsEnabled = false;
+	}
 }

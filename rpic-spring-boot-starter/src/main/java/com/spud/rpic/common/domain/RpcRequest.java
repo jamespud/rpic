@@ -1,10 +1,11 @@
 package com.spud.rpic.common.domain;
 
-import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
 
 /**
  * @author Spud
@@ -16,83 +17,83 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RpcRequest implements Serializable {
 
-  private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-  /**
-   * 请求ID
-   */
-  private String requestId;
+	/**
+	 * 请求ID
+	 */
+	private String requestId;
 
-  /**
-   * 接口名称
-   */
-  private String interfaceName;
+	/**
+	 * 接口名称
+	 */
+	private String interfaceName;
 
-  /**
-   * 服务接口类
-   */
-  private Class<?> interfaceClass;
-  /**
-   * 方法名称
-   */
-  private String methodName;
+	/**
+	 * 服务接口类
+	 */
+	private Class<?> interfaceClass;
+	/**
+	 * 方法名称
+	 */
+	private String methodName;
 
-  private String serviceKey;
+	private String serviceKey;
 
-  /**
-   * 服务版本
-   */
-  private String version;
+	/**
+	 * 服务版本
+	 */
+	private String version;
 
-  /**
-   * 服务分组
-   */
-  private String group;
+	/**
+	 * 服务分组
+	 */
+	private String group;
 
-  /**
-   * 参数类型数组
-   */
-  private Class<?>[] parameterTypes;
+	/**
+	 * 参数类型数组
+	 */
+	private Class<?>[] parameterTypes;
 
-  /**
-   * 参数数组
-   */
-  private Object[] parameters;
+	/**
+	 * 参数数组
+	 */
+	private Object[] parameters;
 
-  /**
-   * 是否单向调用
-   */
-  private boolean oneWay;
+	/**
+	 * 是否单向调用
+	 */
+	private boolean oneWay;
 
-  /**
-   * 调用超时时间
-   */
-  private long timeout;
+	/**
+	 * 调用超时时间
+	 */
+	private long timeout;
 
-  /**
-   * 获取服务标识
-   */
-  public String getServiceKey() {
-    if (serviceKey != null) {
-      return serviceKey;
-    }
-    StringBuilder buf = new StringBuilder();
-    if (group != null && !group.isEmpty()) {
-      buf.append(group).append("/");
-    }
-    buf.append(interfaceName);
-    if (version != null && !version.isEmpty()) {
-      buf.append(":").append(version);
-    }
-    serviceKey = buf.toString();
-    return serviceKey;
-  }
+	/**
+	 * 获取服务标识
+	 */
+	public String getServiceKey() {
+		if (serviceKey != null) {
+			return serviceKey;
+		}
+		StringBuilder buf = new StringBuilder();
+		if (group != null && !group.isEmpty()) {
+			buf.append(group).append("/");
+		}
+		buf.append(interfaceName);
+		if (version != null && !version.isEmpty()) {
+			buf.append(":").append(version);
+		}
+		serviceKey = buf.toString();
+		return serviceKey;
+	}
 
-  /**
-   * 获取调用标识
-   */
-  public String getInvokeKey() {
-    return getServiceKey() + "#" + methodName;
-  }
+	/**
+	 * 获取调用标识
+	 */
+	public String getInvokeKey() {
+		return getServiceKey() + "#" + methodName;
+	}
 
 }
