@@ -1,8 +1,5 @@
 package com.spud.rpic.metrics;
 
-import com.spud.rpic.property.RpcProperties;
-import io.micrometer.core.instrument.*;
-
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Objects;
@@ -10,12 +7,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
-/**
- * Facade around Micrometer metrics with graceful no-op fallbacks when registry or metrics are disabled.
- */
+import com.spud.rpic.property.RpcProperties;
 
-public final class RpcMetricsRecorder {
-
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 	private static final RpcMetricsRecorder NOOP = new RpcMetricsRecorder();
 
 	private final MeterRegistry registry;
@@ -146,38 +146,51 @@ public final class RpcMetricsRecorder {
 
 	public void recordClient(Timer.Sample sample, String service, String method, String endpoint, boolean success,
 	                         Throwable error, long requestBytes, long responseBytes) {
+		recordClient(sample, service, method, endpoint, success, error, requestBytes, responseBytes, null, null);
+	}
+
+	public void recordClient(Timer.Sample sample, String service, String method, String endpoint, boolean success,
+	                         Throwable error, long requestBytes, long responseBytes, Boolean retried, Integer attempt) {
 		if (!enabled) {
 			return;
 		}
 		Iterable<Tag> tags = clientTags(service, method, endpoint, success);
-		Timer timer = clientTimerBuilder.tags(tags).register(registry);
+		Tag[] extra = clientExtraTags(retried, attempt);
+		Iterable<Tag> merged = mergeTags(tags, extra);
+		Timer timer = clientTimerBuilder.tags(merged).register(registry);
 		if (sample != null) {
 			sample.stop(timer);
 		}
-		clientRequestCounterBuilder.tags(tags).register(registry).increment();
+		clientRequestCounterBuilder.tags(merged).register(registry).increment();
 		if (!success) {
-			clientErrorCounterBuilder.tags(tags).tag("error", errorTag(error)).register(registry).increment();
+			clientErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry).increment();
 		}
-		recordBytes(clientRequestBytesBuilder, tags, requestBytes);
-		recordBytes(clientResponseBytesBuilder, tags, responseBytes);
+		recordBytes(clientRequestBytesBuilder, merged, requestBytes);
+		recordBytes(clientResponseBytesBuilder, merged, responseBytes);
 	}
 
 	public void recordServer(Timer.Sample sample, String service, String method, String caller, boolean success,
 	                         Throwable error, long requestBytes, long responseBytes) {
+		recordServer(sample, service, method, caller, success, error, requestBytes, responseBytes, new Tag[0]);
+	}
+
+	public void recordServer(Timer.Sample sample, String service, String method, String caller, boolean success,
+	                         Throwable error, long requestBytes, long responseBytes, Tag... extraTags) {
 		if (!enabled) {
 			return;
 		}
-		Iterable<Tag> tags = serverTags(service, method, caller, success);
-		Timer timer = serverTimerBuilder.tags(tags).register(registry);
+		Iterable<Tag> base = serverTags(service, method, caller, success);
+		Iterable<Tag> merged = mergeTags(base, extraTags);
+		Timer timer = serverTimerBuilder.tags(merged).register(registry);
 		if (sample != null) {
 			sample.stop(timer);
 		}
-		serverRequestCounterBuilder.tags(tags).register(registry).increment();
+		serverRequestCounterBuilder.tags(merged).register(registry).increment();
 		if (!success) {
-			serverErrorCounterBuilder.tags(tags).tag("error", errorTag(error)).register(registry).increment();
+			serverErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry).increment();
 		}
-		recordBytes(serverRequestBytesBuilder, tags, requestBytes);
-		recordBytes(serverResponseBytesBuilder, tags, responseBytes);
+		recordBytes(serverRequestBytesBuilder, merged, requestBytes);
+		recordBytes(serverResponseBytesBuilder, merged, responseBytes);
 	}
 
 	public void recordPoolAcquire(String endpoint, boolean success) {
@@ -211,6 +224,34 @@ public final class RpcMetricsRecorder {
 			return;
 		}
 		builder.tags(tags).register(registry).record(bytes);
+	}
+
+	private Tag[] clientExtraTags(Boolean retried, Integer attempt) {
+		if (retried == null && (attempt == null || !properties.isHighCardinalityTagsEnabled())) {
+			return new Tag[0];
+		}
+		java.util.List<Tag> extras = new java.util.ArrayList<>();
+		if (retried != null) {
+			extras.add(Tag.of("retried", Boolean.toString(retried)));
+		}
+		if (attempt != null && properties.isHighCardinalityTagsEnabled()) {
+			extras.add(Tag.of("attempt", Integer.toString(Math.max(1, attempt))));
+		}
+		return extras.toArray(new Tag[0]);
+	}
+
+	private Iterable<Tag> mergeTags(Iterable<Tag> base, Tag[] extras) {
+		if (extras == null || extras.length == 0) {
+			return base;
+		}
+		Tags merged = Tags.empty();
+		for (Tag tag : base) {
+			merged = merged.and(tag);
+		}
+		for (Tag tag : extras) {
+			merged = merged.and(tag);
+		}
+		return merged;
 	}
 
 	private Iterable<Tag> clientTags(String service, String method, String endpoint, boolean success) {

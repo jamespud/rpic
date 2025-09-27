@@ -123,3 +123,42 @@
 | `rpic.server.request.bytes` / `rpic.server.response.bytes` | 服务端接收/发送负载大小 | - |
 
 > 提示：可通过 `rpc.metrics.enabled=false` 关闭指标；`rpc.metrics.high-cardinality-tags-enabled=false` 可避免方法级高基数标签。
+
+### 六、Phase 1 客户端稳健性增强
+
+- **端到端 Deadline**：客户端在单次调用开始时写入 `deadlineAtMillis`，每次重试只消耗剩余时间；服务端若检测到请求已过期会直接返回超时响应，避免无意义的业务执行。
+- **指数退避重试**：支持全抖动（full jitter）的指数回退策略，可按异常类型与关键字白名单决定是否重试，默认最大 3 次尝试。
+- **熔断与异常实例剔除**：基于 Resilience4j 的每端点熔断器叠加 EWMA/失败率统计，自动隔离高错误率或高延迟节点并定期探活。
+- **P2C+EWMA 负载均衡**：新增 `p2c_ewma` 策略，使用“二选一”+延迟指数滑动平均选择更健康的节点，默认示例已启用。
+- **指标补充标签**：客户端指标新增 `retried`（低基数）与可选 `attempt`（受高基数开关控制）标签，便于追踪重试行为。
+
+示例配置（位于 `rpic-example-simple/simple-client/application.yml`）：
+
+```yaml
+rpc:
+    client:
+        loadbalance: p2c_ewma
+        retry:
+            enabled: true
+            max-attempts: 3
+            base-delay-ms: 50
+            max-delay-ms: 1000
+            multiplier: 2.0
+            jitter-factor: 1.0
+        circuit-breaker:
+            enabled: true
+            failure-rate-threshold: 50
+            slow-call-rate-threshold: 50
+            slow-call-duration-threshold-ms: 1000
+            sliding-window-size: 100
+            minimum-number-of-calls: 50
+            wait-duration-in-open-state-ms: 10000
+        outlier:
+            enabled: true
+            error-rate-threshold: 0.5
+            min-request-volume: 50
+            ejection-duration-ms: 30000
+            probe-interval-ms: 5000
+```
+
+> 验证建议：在示例 server 端模拟部分节点故障或注入延迟，观察客户端重试日志与 `retried=true` 指标计数；通过 Actuator 暴露的 Micrometer 指标对比熔断/剔除前后的端点延迟情况。
