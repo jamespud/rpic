@@ -3,5 +3,28 @@ rpc:
   registry:
     type: zookeeper
     address: localhost:2181
+  client:
+    loadbalance: p2c_ewma
+    retry:
+      enabled: true
+      max-attempts: 3
+      base-delay-ms: 50
+      max-delay-ms: 1000
+      multiplier: 2.0
+      jitter-factor: 1.0
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 50
+      slow-call-rate-threshold: 50
+      slow-call-duration-threshold-ms: 1000
+      sliding-window-size: 100
+      minimum-number-of-calls: 50
+      wait-duration-in-open-state-ms: 10000
+    outlier:
+      enabled: true
+      error-rate-threshold: 0.5
+      min-request-volume: 50
+      ejection-duration-ms: 30000
+      probe-interval-ms: 5000
 server:
   port: 8081
