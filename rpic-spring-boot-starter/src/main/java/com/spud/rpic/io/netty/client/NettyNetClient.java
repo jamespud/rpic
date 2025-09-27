@@ -1,19 +1,26 @@
 package com.spud.rpic.io.netty.client;
 
-import com.spud.rpic.common.constants.RpcConstants;
-import com.spud.rpic.common.domain.RpcRequest;
-import com.spud.rpic.common.domain.RpcResponse;
-import com.spud.rpic.common.exception.RpcException;
-import com.spud.rpic.io.common.ProtocolMsg;
-import com.spud.rpic.io.netty.NetClient;
-import com.spud.rpic.model.ServiceURL;
-import io.netty.channel.Channel;
-import io.netty.util.concurrent.Promise;
-import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 
-import java.util.concurrent.CompletableFuture;
+import com.spud.rpic.common.domain.RpcRequest;
+import com.spud.rpic.common.domain.RpcResponse;
+import com.spud.rpic.common.exception.RpcException;
+import com.spud.rpic.common.exception.TimeoutException;
+import com.spud.rpic.io.common.ProtocolMsg;
+import com.spud.rpic.io.netty.NetClient;
+import com.spud.rpic.metrics.RpcMetricsRecorder;
+import com.spud.rpic.model.ServiceURL;
+
+import io.micrometer.core.instrument.Timer;
+import io.netty.channel.Channel;
+import io.netty.util.concurrent.Promise;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud
@@ -22,149 +29,240 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class NettyNetClient implements NetClient, InitializingBean, DisposableBean {
 
-  private final ConnectionPool connectionPool;
-  private final RpcClientHandler clientHandler;
+	private final ConnectionPool connectionPool;
+	private final RpcClientHandler clientHandler;
+	private final RpcMetricsRecorder metricsRecorder;
+	private final ConcurrentMap<String, PendingClientMetric> pendingMetrics = new ConcurrentHashMap<>();
 
-  public NettyNetClient(ConnectionPool connectionPool, RpcClientHandler clientHandler) {
-    this.connectionPool = connectionPool;
-    this.clientHandler = clientHandler;
-  }
+	public NettyNetClient(ConnectionPool connectionPool, RpcClientHandler clientHandler,
+	                      RpcMetricsRecorder metricsRecorder) {
+		this.connectionPool = connectionPool;
+		this.clientHandler = clientHandler;
+		this.metricsRecorder = metricsRecorder;
+	}
 
-  @Override
-  public RpcResponse send(ServiceURL serviceURL, RpcRequest request, int timeout) throws Exception {
-    log.debug("Sending request to {}, request: {}", serviceURL, request.getRequestId());
+	@Override
+	public RpcResponse send(ServiceURL serviceURL, RpcRequest request, int timeout) throws Exception {
+		log.debug("Sending request to {}, request: {}", serviceURL, request.getRequestId());
 
-    // 验证服务URL
-    if (serviceURL == null || serviceURL.getHost() == null || serviceURL.getHost().isEmpty()) {
-      throw new RpcException("Invalid service URL: " + serviceURL);
-    }
+		if (serviceURL == null || serviceURL.getHost() == null || serviceURL.getHost().isEmpty()) {
+			throw new RpcException("Invalid service URL: " + serviceURL);
+		}
 
-    // 1. 获取连接
-    Channel channel = connectionPool.acquireChannel(serviceURL);
-    if (!channel.isActive()) {
-      connectionPool.releaseChannel(serviceURL, channel);
-      throw new RpcException("Channel is not active");
-    }
+		final Timer.Sample sample = metricsRecorder.startClientSample();
+		final String requestId = request.getRequestId();
+		final String endpoint = endpointOf(serviceURL);
+		final String serviceKey = request.getServiceKey();
+		final String methodName = request.getMethodName();
 
-    try {
-      // 2. 创建Promise并注册
-      Promise<RpcResponse> promise = channel.eventLoop().newPromise();
-      clientHandler.addPromise(request.getRequestId(), promise, channel.eventLoop(), timeout);
+		Channel channel = null;
+		Promise<RpcResponse> promise = null;
 
-      // 3. 序列化请求
-      byte[] requestBytes = clientHandler.getSerializer().serialize(request);
+		try {
+			channel = connectionPool.acquireChannel(serviceURL);
+			if (!channel.isActive()) {
+				connectionPool.releaseChannel(serviceURL, channel);
+				RpcException error = new RpcException("Channel is not active");
+				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1);
+				throw error;
+			}
 
-      // 4. 创建协议消息
-      ProtocolMsg protocolMsg = ProtocolMsg.fromBytes(requestBytes);
+			promise = channel.eventLoop().newPromise();
+			final Promise<RpcResponse> requestPromise = promise;
+			clientHandler.addPromise(requestId, requestPromise, channel.eventLoop(), timeout);
 
-      // 5. 发送消息
-      channel.writeAndFlush(protocolMsg).addListener(future -> {
-        if (!future.isSuccess()) {
-          log.error("Failed to send request: {}", request.getRequestId());
-          clientHandler.removePromise(request.getRequestId());
-          promise.tryFailure(future.cause());
-          connectionPool.releaseChannel(serviceURL, channel);
-        } else {
-          log.debug("Request sent successfully: {}", request.getRequestId());
-        }
-      });
+			byte[] requestBytes = clientHandler.getSerializer().serialize(request);
+			byte serializerCode = clientHandler.getSerializer().getCode();
+			PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName, endpoint,
+				requestBytes.length);
+			pendingMetrics.put(requestId, metric);
 
-      // 6. 等待响应
-      return promise.get(timeout, java.util.concurrent.TimeUnit.MILLISECONDS);
+			requestPromise.addListener(promiseFuture -> {
+				PendingClientMetric removed = pendingMetrics.remove(requestId);
+				try {
+					if (removed != null) {
+						RpcResponse response = promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
+						Throwable cause = promiseFuture.isSuccess() ? null : promiseFuture.cause();
+						boolean success = promiseFuture.isSuccess() && response != null
+							&& !Boolean.TRUE.equals(response.getError());
+						if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(response.getError())) {
+							cause = new RpcException(response.getErrorMsg());
+							success = false;
+						}
+						int responseBytes = clientHandler.pollResponseSize(requestId);
+						metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
+							removed.endpoint, success, cause, removed.requestBytes, responseBytes);
+					}
+				} finally {
+					clientHandler.removePromise(requestId);
+				}
+			});
 
-    } finally {
-      clientHandler.removePromise(request.getRequestId());
-      connectionPool.releaseChannel(serviceURL, channel);
-    }
-  }
+			ProtocolMsg protocolMsg = ProtocolMsg.fromBytes(requestBytes, serializerCode);
 
-  @Override
-  public CompletableFuture<RpcResponse> sendAsync(ServiceURL serviceUrl, RpcRequest request, int timeout) {
-    CompletableFuture<RpcResponse> future = new CompletableFuture<>();
+			channel.writeAndFlush(protocolMsg).addListener(writeFuture -> {
+				if (!writeFuture.isSuccess()) {
+					log.error("Failed to send request: {}", requestId, writeFuture.cause());
+					requestPromise.tryFailure(writeFuture.cause());
+				} else {
+					log.debug("Request sent successfully: {}", requestId);
+				}
+			});
 
-    try {
-      // 验证服务URL
-      if (serviceUrl == null || serviceUrl.getHost() == null || serviceUrl.getHost().isEmpty()) {
-        throw new RpcException("Invalid service URL: " + serviceUrl);
-      }
+			return requestPromise.get(timeout, TimeUnit.MILLISECONDS);
+		} catch (java.util.concurrent.TimeoutException e) {
+			PendingClientMetric removed = pendingMetrics.remove(requestId);
+			if (removed != null) {
+				metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
+					removed.endpoint, false, e, removed.requestBytes, -1);
+			} else {
+				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+			}
+			throw new TimeoutException("Request timeout after " + timeout + "ms", e);
+		} finally {
+			if (promise != null && !promise.isDone()) {
+				clientHandler.removePromise(requestId);
+			}
+			if (channel != null) {
+				connectionPool.releaseChannel(serviceURL, channel);
+			}
+		}
+	}
 
-      // 1. 异步获取连接
-      connectionPool.acquireChannelAsync(serviceUrl).thenAccept(channel -> {
-        if (!channel.isActive()) {
-          future.completeExceptionally(new RpcException("Channel is not active"));
-          connectionPool.releaseChannel(serviceUrl, channel);
-          return;
-        }
+	@Override
+	public CompletableFuture<RpcResponse> sendAsync(ServiceURL serviceUrl, RpcRequest request, int timeout) {
+		CompletableFuture<RpcResponse> future = new CompletableFuture<>();
+		final Timer.Sample sample = metricsRecorder.startClientSample();
 
-        try {
-          // 2. 创建Promise并注册
-          Promise<RpcResponse> promise = channel.eventLoop().newPromise();
-          clientHandler.addPromise(request.getRequestId(), promise, channel.eventLoop(), timeout);
+		final String requestId = request.getRequestId();
+		final String endpoint = endpointOf(serviceUrl);
+		final String serviceKey = request.getServiceKey();
+		final String methodName = request.getMethodName();
 
-          // 3. 序列化请求
-          byte[] requestBytes = clientHandler.getSerializer().serialize(request);
+		try {
+			if (serviceUrl == null || serviceUrl.getHost() == null || serviceUrl.getHost().isEmpty()) {
+				throw new RpcException("Invalid service URL: " + serviceUrl);
+			}
 
-          // 4. 创建协议消息
-          ProtocolMsg protocolMsg = ProtocolMsg.fromBytes(requestBytes);
+			connectionPool.acquireChannelAsync(serviceUrl).thenAccept(channel -> {
+				if (!channel.isActive()) {
+					RpcException error = new RpcException("Channel is not active");
+					metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1);
+					future.completeExceptionally(error);
+					connectionPool.releaseChannel(serviceUrl, channel);
+					return;
+				}
 
-          // 5. 发送消息
-          channel.writeAndFlush(protocolMsg).addListener(writeFuture -> {
-            if (!writeFuture.isSuccess()) {
-              log.error("Failed to send async request: {}", request.getRequestId());
-              clientHandler.removePromise(request.getRequestId());
-              future.completeExceptionally(writeFuture.cause());
-              connectionPool.releaseChannel(serviceUrl, channel);
-            } else {
-              log.debug("Async request sent successfully: {}", request.getRequestId());
-            }
-          });
+				try {
+					Promise<RpcResponse> promise = channel.eventLoop().newPromise();
+					clientHandler.addPromise(requestId, promise, channel.eventLoop(), timeout);
 
-          // 6. 设置Promise完成回调
-          promise.addListener(promiseFuture -> {
-            try {
-              if (promiseFuture.isSuccess()) {
-                future.complete((RpcResponse) promiseFuture.getNow());
-              } else {
-                future.completeExceptionally(promiseFuture.cause());
-              }
-            } finally {
-              clientHandler.removePromise(request.getRequestId());
-              connectionPool.releaseChannel(serviceUrl, channel);
-            }
-          });
+					byte[] requestBytes = clientHandler.getSerializer().serialize(request);
+					byte serializerCode = clientHandler.getSerializer().getCode();
+					PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName, endpoint,
+						requestBytes.length);
+					pendingMetrics.put(requestId, metric);
 
-        } catch (Exception e) {
-          log.error("Error processing async request: {}", request.getRequestId(), e);
-          clientHandler.removePromise(request.getRequestId());
-          future.completeExceptionally(e);
-          connectionPool.releaseChannel(serviceUrl, channel);
-        }
-      }).exceptionally(e -> {
-        log.error("Failed to acquire channel for async request: {}", request.getRequestId(), e);
-        future.completeExceptionally(new RpcException("Failed to acquire channel", e));
-        return null;
-      });
-    } catch (Exception e) {
-      log.error("Failed to send async request: {}", request.getRequestId(), e);
-      future.completeExceptionally(e);
-    }
+					promise.addListener(promiseFuture -> {
+						PendingClientMetric removed = pendingMetrics.remove(requestId);
+						try {
+							if (removed != null) {
+								RpcResponse response = promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
+								Throwable cause = promiseFuture.isSuccess() ? null : promiseFuture.cause();
+								boolean success = promiseFuture.isSuccess() && response != null
+									&& !Boolean.TRUE.equals(response.getError());
+								if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(response.getError())) {
+									cause = new RpcException(response.getErrorMsg());
+									success = false;
+								}
+								int responseBytes = clientHandler.pollResponseSize(requestId);
+								metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
+									removed.endpoint, success, cause, removed.requestBytes, responseBytes);
+							}
 
-    return future;
-  }
+							if (promiseFuture.isSuccess()) {
+								future.complete((RpcResponse) promiseFuture.getNow());
+							} else {
+								future.completeExceptionally(promiseFuture.cause());
+							}
+						} finally {
+							clientHandler.removePromise(requestId);
+							connectionPool.releaseChannel(serviceUrl, channel);
+						}
+					});
 
-  @Override
-  public void close() {
-    connectionPool.close();
-  }
+					ProtocolMsg protocolMsg = ProtocolMsg.fromBytes(requestBytes, serializerCode);
 
-  @Override
-  public void destroy() throws Exception {
-    this.close();
-    clientHandler.close();
-  }
+					channel.writeAndFlush(protocolMsg).addListener(writeFuture -> {
+						if (!writeFuture.isSuccess()) {
+							log.error("Failed to send async request: {}", requestId, writeFuture.cause());
+							promise.tryFailure(writeFuture.cause());
+						} else {
+							log.debug("Async request sent successfully: {}", requestId);
+						}
+					});
+				} catch (Exception e) {
+					log.error("Error processing async request: {}", requestId, e);
+					clientHandler.removePromise(requestId);
+					PendingClientMetric removed = pendingMetrics.remove(requestId);
+					if (removed != null) {
+						metricsRecorder.recordClient(removed.sample, removed.serviceKey, removed.methodName,
+							removed.endpoint, false, e, removed.requestBytes, -1);
+					} else {
+						metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+					}
+					future.completeExceptionally(e);
+					connectionPool.releaseChannel(serviceUrl, channel);
+				}
+			}).exceptionally(e -> {
+				log.error("Failed to acquire channel for async request: {}", requestId, e);
+				RpcException error = new RpcException("Failed to acquire channel", e);
+				metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1);
+				future.completeExceptionally(error);
+				return null;
+			});
+		} catch (Exception e) {
+			log.error("Failed to send async request: {}", requestId, e);
+			metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, e, 0, -1);
+			future.completeExceptionally(e);
+		}
 
-  @Override
-  public void afterPropertiesSet() {
-    // 初始化逻辑（如果需要）
-  }
+		return future;
+	}
+
+	@Override
+	public void close() {
+		connectionPool.close();
+	}
+
+	@Override
+	public void destroy() {
+		this.close();
+		clientHandler.close();
+	}
+
+	@Override
+	public void afterPropertiesSet() {
+		// 初始化逻辑（如果需要）
+	}
+
+	private String endpointOf(ServiceURL serviceURL) {
+		return serviceURL.getHost() + ":" + serviceURL.getPort();
+	}
+
+	private static final class PendingClientMetric {
+		final Timer.Sample sample;
+		final String serviceKey;
+		final String methodName;
+		final String endpoint;
+		final long requestBytes;
+
+		PendingClientMetric(Timer.Sample sample, String serviceKey, String methodName, String endpoint, long requestBytes) {
+			this.sample = sample;
+			this.serviceKey = serviceKey != null ? serviceKey : "unknown";
+			this.methodName = methodName != null ? methodName : "unknown";
+			this.endpoint = endpoint != null ? endpoint : "unknown";
+			this.requestBytes = requestBytes;
+		}
+	}
 }
