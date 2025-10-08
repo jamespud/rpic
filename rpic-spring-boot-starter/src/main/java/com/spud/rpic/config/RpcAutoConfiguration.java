@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 /*
  *@author Spud
  *@date 2025/2/13
@@ -36,7 +37,7 @@ public class RpcAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public RpcMetricsRecorder rpcMetricsRecorder(ObjectProvider<MeterRegistry> meterRegistryProvider,
-	                                             RpcProperties rpcProperties) {
+		RpcProperties rpcProperties) {
 		MeterRegistry meterRegistry = meterRegistryProvider.getIfAvailable();
 		return RpcMetricsRecorder.create(meterRegistry, rpcProperties.getMetrics());
 	}

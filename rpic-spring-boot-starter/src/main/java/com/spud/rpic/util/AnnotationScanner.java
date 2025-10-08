@@ -1,12 +1,11 @@
 package com.spud.rpic.util;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationContext;
-import org.springframework.util.ReflectionUtils;
-
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
+import org.springframework.util.ReflectionUtils;
 
 /**
  * @author Spud
@@ -23,8 +22,8 @@ public class AnnotationScanner {
 	 * @param handler        注解处理器
 	 */
 	public static void scanAnnotations(ApplicationContext context,
-	                                   Class<? extends Annotation> annotationType,
-	                                   AnnotationHandler handler) {
+		Class<? extends Annotation> annotationType,
+		AnnotationHandler handler) {
 		String[] beanNames = context.getBeanDefinitionNames();
 		for (String beanName : beanNames) {
 			Object bean = context.getBean(beanName);

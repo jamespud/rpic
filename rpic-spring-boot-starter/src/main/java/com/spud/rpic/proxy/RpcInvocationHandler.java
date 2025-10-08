@@ -5,12 +5,11 @@ import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.common.exception.RpcException;
 import com.spud.rpic.io.netty.client.invocation.ClientInvocation;
 import com.spud.rpic.model.ServiceMetadata;
+import java.lang.reflect.Method;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-
-import java.lang.reflect.Method;
-import java.util.UUID;
 
 /**
  * @author Spud
@@ -27,7 +26,7 @@ public class RpcInvocationHandler implements MethodInterceptor {
 	private final int timeout;
 
 	public RpcInvocationHandler(ClientInvocation clientInvocation, Class<?> interfaceClass,
-	                            String serviceName, String version, String group, int timeout) {
+		String serviceName, String version, String group, int timeout) {
 		this.clientInvocation = clientInvocation;
 		this.interfaceClass = interfaceClass;
 		this.serviceName = serviceName;
@@ -83,7 +82,8 @@ public class RpcInvocationHandler implements MethodInterceptor {
 				});
 		} catch (Exception e) {
 			log.error("Failed to invoke async remote service: {}", metadata.getServiceId(), e);
-			throw new RpcException("Failed to invoke async remote service: " + metadata.getServiceId(), e);
+			throw new RpcException("Failed to invoke async remote service: " + metadata.getServiceId(),
+				e);
 		}
 	}
 

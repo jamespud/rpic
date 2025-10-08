@@ -1,15 +1,5 @@
 package com.spud.rpic.io.netty.client.invocation;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-
-import javax.naming.ServiceUnavailableException;
-
 import com.spud.rpic.cluster.CircuitBreakerManager;
 import com.spud.rpic.cluster.EndpointStatsRegistry;
 import com.spud.rpic.cluster.LoadBalancer;
@@ -24,8 +14,17 @@ import com.spud.rpic.model.ServiceMetadata;
 import com.spud.rpic.model.ServiceURL;
 import com.spud.rpic.property.RpcClientProperties;
 import com.spud.rpic.registry.Registry;
-
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import javax.naming.ServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
+
+/**
  * @author Spud
  * @date 2025/2/9
  */
@@ -45,9 +44,9 @@ public class DefaultClientInvocation implements ClientInvocation {
 	private final EndpointStatsRegistry endpointStatsRegistry;
 
 	public DefaultClientInvocation(Registry registry, LoadBalancer loadBalancer, NetClient netClient,
-	                               RpcClientProperties clientProperties,
-	                               CircuitBreakerManager circuitBreakerManager,
-	                               EndpointStatsRegistry endpointStatsRegistry) {
+		RpcClientProperties clientProperties,
+		CircuitBreakerManager circuitBreakerManager,
+		EndpointStatsRegistry endpointStatsRegistry) {
 		this.registry = registry;
 		this.loadBalancer = loadBalancer;
 		this.netClient = netClient;
@@ -57,7 +56,8 @@ public class DefaultClientInvocation implements ClientInvocation {
 	}
 
 	@Override
-	public RpcResponse invoke(ServiceMetadata metadata, RpcRequest request, int timeout) throws Exception {
+	public RpcResponse invoke(ServiceMetadata metadata, RpcRequest request, int timeout)
+		throws Exception {
 		RpcClientProperties.RetryProperties retryProps = clientProperties.getRetry();
 		int maxAttempts = Math.max(1, retryProps.isEnabled() ? retryProps.getMaxAttempts() : 1);
 		long overallTimeout = timeout > 0 ? timeout : clientProperties.getTimeout();
@@ -75,13 +75,15 @@ public class DefaultClientInvocation implements ClientInvocation {
 
 			ServiceURL selected = selectHealthyInstance(metadata, attemptedEndpoints);
 			if (selected == null) {
-				throw new ServiceUnavailableException("No healthy instance available for service: " + metadata.getServiceKey());
+				throw new ServiceUnavailableException(
+					"No healthy instance available for service: " + metadata.getServiceKey());
 			}
 
 			String endpoint = selected.getAddress();
 			if (!circuitBreakerManager.tryAcquirePermission(endpoint)) {
 				attemptedEndpoints.add(endpoint);
-				lastException = new ServiceUnavailableException("Circuit breaker open for endpoint: " + endpoint);
+				lastException = new ServiceUnavailableException(
+					"Circuit breaker open for endpoint: " + endpoint);
 				continue;
 			}
 
@@ -111,7 +113,8 @@ public class DefaultClientInvocation implements ClientInvocation {
 					throw new RpcException("Invocation failed", ex);
 				}
 
-				long backoff = Math.min(computeBackoffMillis(retryProps, attempt), deadlineAtMillis - System.currentTimeMillis());
+				long backoff = Math.min(computeBackoffMillis(retryProps, attempt),
+					deadlineAtMillis - System.currentTimeMillis());
 				if (backoff > 0) {
 					TimeUnit.MILLISECONDS.sleep(backoff);
 				}
@@ -125,12 +128,14 @@ public class DefaultClientInvocation implements ClientInvocation {
 	}
 
 	@Override
-	public CompletableFuture<RpcResponse> invokeAsync(ServiceMetadata metadata, RpcRequest request, int timeout) {
+	public CompletableFuture<RpcResponse> invokeAsync(ServiceMetadata metadata, RpcRequest request,
+		int timeout) {
 		CompletableFuture<RpcResponse> future = new CompletableFuture<>();
 		try {
 			ServiceURL selected = selectHealthyInstance(metadata, new HashSet<>());
 			if (selected == null) {
-				future.completeExceptionally(new ServiceUnavailableException("No healthy instance available"));
+				future.completeExceptionally(
+					new ServiceUnavailableException("No healthy instance available"));
 				return future;
 			}
 			long overallTimeout = timeout > 0 ? timeout : clientProperties.getTimeout();
@@ -141,15 +146,18 @@ public class DefaultClientInvocation implements ClientInvocation {
 			request.setTimeout(perAttemptTimeout);
 			return netClient.sendAsync(selected, request, perAttemptTimeout);
 		} catch (Exception e) {
-			future.completeExceptionally(new RpcException("Failed to invoke remote service: " + metadata.getServiceId(), e));
+			future.completeExceptionally(
+				new RpcException("Failed to invoke remote service: " + metadata.getServiceId(), e));
 			return future;
 		}
 	}
 
-	private ServiceURL selectHealthyInstance(ServiceMetadata metadata, Set<String> attemptedEndpoints) throws Exception {
+	private ServiceURL selectHealthyInstance(ServiceMetadata metadata, Set<String> attemptedEndpoints)
+		throws Exception {
 		List<ServiceURL> instances = registry.discover(metadata);
 		if (instances == null || instances.isEmpty()) {
-			throw new ServiceNotFoundException("No available instances for service: " + metadata.getServiceKey());
+			throw new ServiceNotFoundException(
+				"No available instances for service: " + metadata.getServiceKey());
 		}
 
 		List<ServiceURL> candidates = new ArrayList<>();
@@ -175,7 +183,8 @@ public class DefaultClientInvocation implements ClientInvocation {
 		return loadBalancer.select(new ArrayList<>(candidates));
 	}
 
-	private boolean shouldRetry(Throwable throwable, RpcClientProperties.RetryProperties retryProps, int attempt, int maxAttempts) {
+	private boolean shouldRetry(Throwable throwable, RpcClientProperties.RetryProperties retryProps,
+		int attempt, int maxAttempts) {
 		if (!retryProps.isEnabled() || attempt >= maxAttempts) {
 			return false;
 		}

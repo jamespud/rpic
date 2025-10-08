@@ -9,7 +9,6 @@ import com.spud.rpic.io.netty.server.invocation.DefaultServerInvocation;
 import com.spud.rpic.io.serializer.Serializer;
 import com.spud.rpic.io.serializer.SerializerFactory;
 import com.spud.rpic.metrics.RpcMetricsRecorder;
-
 import io.micrometer.core.instrument.Timer;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -31,7 +30,7 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 	 * 创建主Handler实例（由Spring管理的单例）
 	 */
 	public RpcServerHandler(Serializer serializer, SerializerFactory serializerFactory,
-	                        DefaultServerInvocation defaultServerInvocation, RpcMetricsRecorder metricsRecorder) {
+		DefaultServerInvocation defaultServerInvocation, RpcMetricsRecorder metricsRecorder) {
 		this.serializer = serializer;
 		this.serializerFactory = serializerFactory;
 		this.defaultServerInvocation = defaultServerInvocation;
@@ -62,7 +61,8 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, ProtocolMsg msg) throws Exception {
-		log.debug("Server Channel[{}] channelRead0 received message: type={} (hex: 0x{}), contentLength={}, contentStart={}",
+		log.debug(
+			"Server Channel[{}] channelRead0 received message: type={} (hex: 0x{}), contentLength={}, contentStart={}",
 			ctx.channel().id().asShortText(), msg.getType(),
 			Integer.toHexString(msg.getType() & 0xFF), msg.getContentLength(),
 			msg.getContent() != null && msg.getContent().length > 0
@@ -91,17 +91,22 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 				Long deadlineAt = request.getDeadlineAtMillis();
 				if (deadlineAt != null && System.currentTimeMillis() > deadlineAt) {
-					TimeoutException timeoutException = new TimeoutException("Request deadline exceeded before execution");
+					TimeoutException timeoutException = new TimeoutException(
+						"Request deadline exceeded before execution");
 					RpcResponse timeoutResponse = RpcResponse.error(request.getRequestId(), timeoutException);
 					byte[] timeoutBytes = activeSerializer.serialize(timeoutResponse);
-					metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(), caller,
+					metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(),
+						caller,
 						false, timeoutException, requestBytesLength, timeoutBytes.length);
-					ProtocolMsg timeoutMsg = ProtocolMsg.responseFromBytes(timeoutBytes, activeSerializer.getCode());
+					ProtocolMsg timeoutMsg = ProtocolMsg.responseFromBytes(timeoutBytes,
+						activeSerializer.getCode());
 					log.warn("Server Channel[{}] Dropping request {} due to exceeded deadline {} < now {}",
-						ctx.channel().id().asShortText(), request.getRequestId(), deadlineAt, System.currentTimeMillis());
+						ctx.channel().id().asShortText(), request.getRequestId(), deadlineAt,
+						System.currentTimeMillis());
 					ctx.writeAndFlush(timeoutMsg).addListener(future -> {
 						if (!future.isSuccess()) {
-							log.error("Server Channel[{}] Failed to send timeout response for request: {}", ctx.channel().id().asShortText(), request.getRequestId(), future.cause());
+							log.error("Server Channel[{}] Failed to send timeout response for request: {}",
+								ctx.channel().id().asShortText(), request.getRequestId(), future.cause());
 						}
 					});
 					return;
@@ -113,15 +118,19 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 					ctx.channel().id().asShortText(), request.getRequestId(), response);
 
 				byte[] responseBytes = activeSerializer.serialize(response);
-				log.debug("Server Channel[{}] Serialized response for request: {}, bytes length: {}, start: {}",
+				log.debug(
+					"Server Channel[{}] Serialized response for request: {}, bytes length: {}, start: {}",
 					ctx.channel().id().asShortText(), request.getRequestId(), responseBytes.length,
 					bytesToHex(responseBytes, 0, Math.min(20, responseBytes.length)));
-				metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(), caller,
+				metricsRecorder.recordServer(sample, request.getServiceKey(), request.getMethodName(),
+					caller,
 					true, null, requestBytesLength, responseBytes.length);
 
 				// 使用新的便捷方法创建响应消息
-				ProtocolMsg responseMsg = ProtocolMsg.responseFromBytes(responseBytes, activeSerializer.getCode());
-				log.debug("Server Channel[{}] Created response message, type: {} (hex: 0x{}), contentLength: {}",
+				ProtocolMsg responseMsg = ProtocolMsg.responseFromBytes(responseBytes,
+					activeSerializer.getCode());
+				log.debug(
+					"Server Channel[{}] Created response message, type: {} (hex: 0x{}), contentLength: {}",
 					ctx.channel().id().asShortText(), responseMsg.getType(),
 					Integer.toHexString(responseMsg.getType() & 0xFF), responseMsg.getContentLength());
 
@@ -136,7 +145,8 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 							ctx.channel().id().asShortText(), requestIdForLog, System.currentTimeMillis());
 					} else {
 						log.error("Server Channel[{}] Failed to send response for request: {}, error: {}",
-							ctx.channel().id().asShortText(), requestIdForLog, future.cause().getMessage(), future.cause());
+							ctx.channel().id().asShortText(), requestIdForLog, future.cause().getMessage(),
+							future.cause());
 					}
 				});
 			} catch (Exception e) {
@@ -168,7 +178,8 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-		log.error("Server Channel[{}] RpcServerHandler exception", ctx.channel().id().asShortText(), cause);
+		log.error("Server Channel[{}] RpcServerHandler exception", ctx.channel().id().asShortText(),
+			cause);
 		ctx.close();
 	}
 
@@ -195,7 +206,8 @@ public class RpcServerHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 		try {
 			return serializerFactory.getSerializer(serializerType);
 		} catch (IllegalArgumentException ignored) {
-			log.warn("Unsupported serializer code: {}, fallback to default {}", serializerType, serializer.getType());
+			log.warn("Unsupported serializer code: {}, fallback to default {}", serializerType,
+				serializer.getType());
 			return serializer;
 		}
 	}

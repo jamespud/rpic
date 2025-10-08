@@ -5,9 +5,8 @@ import com.spud.rpic.io.common.ProtocolMsg;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud
@@ -46,7 +45,8 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 			log.error("Channel[{}] Invalid magic number: {} (hex: 0x{}), expected: {} (hex: 0x{})",
 				ctx.channel().id().asShortText(),
 				magicNumber, Integer.toHexString(magicNumber & 0xFF),
-				RpcConstants.PROTOCOL_MAGIC_NUMBER, Integer.toHexString(RpcConstants.PROTOCOL_MAGIC_NUMBER & 0xFF));
+				RpcConstants.PROTOCOL_MAGIC_NUMBER,
+				Integer.toHexString(RpcConstants.PROTOCOL_MAGIC_NUMBER & 0xFF));
 
 			// 尝试跳过这个错误的字节，寻找有效的魔数
 			in.resetReaderIndex();
@@ -60,7 +60,8 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		byte serializerType = in.readByte();
 
 		// 打印类型信息
-		log.info("Channel[{}] Read message type: {} (hex: 0x{}), serializerType={}, comparing with TYPE_RESPONSE={}",
+		log.info(
+			"Channel[{}] Read message type: {} (hex: 0x{}), serializerType={}, comparing with TYPE_RESPONSE={}",
 			ctx.channel().id().asShortText(), type, Integer.toHexString(type & 0xFF), serializerType,
 			RpcConstants.TYPE_RESPONSE);
 
@@ -70,7 +71,8 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		// 确保长度合理
 		if (contentLength < 0 || contentLength > ProtocolMsg.MAX_FRAME_LENGTH) {
 			in.resetReaderIndex();
-			log.error("Channel[{}] Invalid content length: {}", ctx.channel().id().asShortText(), contentLength);
+			log.error("Channel[{}] Invalid content length: {}", ctx.channel().id().asShortText(),
+				contentLength);
 			skipInvalidBytes(ctx, in);
 			return;
 		}
@@ -78,7 +80,8 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		// 如果可读字节不足，等待更多数据
 		if (in.readableBytes() < contentLength) {
 			in.resetReaderIndex();
-			log.debug("Channel[{}] Not enough bytes for content, waiting for more data. Need: {}, Available: {}",
+			log.debug(
+				"Channel[{}] Not enough bytes for content, waiting for more data. Need: {}, Available: {}",
 				ctx.channel().id().asShortText(), contentLength, in.readableBytes());
 			return;
 		}
@@ -97,8 +100,10 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		}
 
 		// 创建消息对象
-		ProtocolMsg protocolMsg = new ProtocolMsg(magicNumber, version, type, serializerType, contentLength, content);
-		log.info("Channel[{}] Decoded ProtocolMsg: magic=0x{}, version={}, type={} (hex: 0x{}), contentLength={}",
+		ProtocolMsg protocolMsg = new ProtocolMsg(magicNumber, version, type, serializerType,
+			contentLength, content);
+		log.info(
+			"Channel[{}] Decoded ProtocolMsg: magic=0x{}, version={}, type={} (hex: 0x{}), contentLength={}",
 			ctx.channel().id().asShortText(),
 			Integer.toHexString(magicNumber & 0xFF),
 			version,

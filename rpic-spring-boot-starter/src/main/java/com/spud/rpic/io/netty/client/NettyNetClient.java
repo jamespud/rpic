@@ -1,13 +1,5 @@
 package com.spud.rpic.io.netty.client;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.InitializingBean;
-
 import com.spud.rpic.common.domain.RpcRequest;
 import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.common.exception.RpcException;
@@ -16,11 +8,16 @@ import com.spud.rpic.io.common.ProtocolMsg;
 import com.spud.rpic.io.netty.NetClient;
 import com.spud.rpic.metrics.RpcMetricsRecorder;
 import com.spud.rpic.model.ServiceURL;
-
 import io.micrometer.core.instrument.Timer;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Promise;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.InitializingBean;
 
 /**
  * @author Spud
@@ -35,7 +32,7 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 	private final ConcurrentMap<String, PendingClientMetric> pendingMetrics = new ConcurrentHashMap<>();
 
 	public NettyNetClient(ConnectionPool connectionPool, RpcClientHandler clientHandler,
-	                      RpcMetricsRecorder metricsRecorder) {
+		RpcMetricsRecorder metricsRecorder) {
 		this.connectionPool = connectionPool;
 		this.clientHandler = clientHandler;
 		this.metricsRecorder = metricsRecorder;
@@ -83,11 +80,13 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 				PendingClientMetric removed = pendingMetrics.remove(requestId);
 				try {
 					if (removed != null) {
-						RpcResponse response = promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
+						RpcResponse response =
+							promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
 						Throwable cause = promiseFuture.isSuccess() ? null : promiseFuture.cause();
 						boolean success = promiseFuture.isSuccess() && response != null
 							&& !Boolean.TRUE.equals(response.getError());
-						if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(response.getError())) {
+						if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(
+							response.getError())) {
 							cause = new RpcException(response.getErrorMsg());
 							success = false;
 						}
@@ -134,7 +133,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 	}
 
 	@Override
-	public CompletableFuture<RpcResponse> sendAsync(ServiceURL serviceUrl, RpcRequest request, int timeout) {
+	public CompletableFuture<RpcResponse> sendAsync(ServiceURL serviceUrl, RpcRequest request,
+		int timeout) {
 		CompletableFuture<RpcResponse> future = new CompletableFuture<>();
 		final Timer.Sample sample = metricsRecorder.startClientSample();
 
@@ -153,7 +153,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 			connectionPool.acquireChannelAsync(serviceUrl).thenAccept(channel -> {
 				if (!channel.isActive()) {
 					RpcException error = new RpcException("Channel is not active");
-					metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0, -1);
+					metricsRecorder.recordClient(sample, serviceKey, methodName, endpoint, false, error, 0,
+						-1);
 					future.completeExceptionally(error);
 					connectionPool.releaseChannel(serviceUrl, channel);
 					return;
@@ -165,7 +166,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 
 					byte[] requestBytes = clientHandler.getSerializer().serialize(request);
 					byte serializerCode = clientHandler.getSerializer().getCode();
-					PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName, endpoint,
+					PendingClientMetric metric = new PendingClientMetric(sample, serviceKey, methodName,
+						endpoint,
 						requestBytes.length, retried, attempt);
 					pendingMetrics.put(requestId, metric);
 
@@ -173,11 +175,13 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 						PendingClientMetric removed = pendingMetrics.remove(requestId);
 						try {
 							if (removed != null) {
-								RpcResponse response = promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
+								RpcResponse response =
+									promiseFuture.isSuccess() ? (RpcResponse) promiseFuture.getNow() : null;
 								Throwable cause = promiseFuture.isSuccess() ? null : promiseFuture.cause();
 								boolean success = promiseFuture.isSuccess() && response != null
 									&& !Boolean.TRUE.equals(response.getError());
-								if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(response.getError())) {
+								if (promiseFuture.isSuccess() && response != null && Boolean.TRUE.equals(
+									response.getError())) {
 									cause = new RpcException(response.getErrorMsg());
 									success = false;
 								}
@@ -262,6 +266,7 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 	}
 
 	private static final class PendingClientMetric {
+
 		final Timer.Sample sample;
 		final String serviceKey;
 		final String methodName;
@@ -270,7 +275,8 @@ public class NettyNetClient implements NetClient, InitializingBean, DisposableBe
 		final boolean retried;
 		final Integer attempt;
 
-		PendingClientMetric(Timer.Sample sample, String serviceKey, String methodName, String endpoint, long requestBytes,
+		PendingClientMetric(Timer.Sample sample, String serviceKey, String methodName, String endpoint,
+			long requestBytes,
 			boolean retried, Integer attempt) {
 			this.sample = sample;
 			this.serviceKey = serviceKey != null ? serviceKey : "unknown";

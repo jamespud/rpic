@@ -2,7 +2,6 @@ package com.spud.rpic.cluster;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import org.springframework.stereotype.Component;
 
 /**

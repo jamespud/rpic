@@ -8,8 +8,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spud.rpic.model.ServiceMetadata;
 import com.spud.rpic.model.ServiceURL;
 import com.spud.rpic.property.RpcProperties;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud
