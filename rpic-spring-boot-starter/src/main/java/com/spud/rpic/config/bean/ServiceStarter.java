@@ -1,5 +1,9 @@
 package com.spud.rpic.config.bean;
 
+import static com.spud.rpic.util.CommonUtils.buildConsumerMetadata;
+import static com.spud.rpic.util.CommonUtils.buildMethodServiceMetadata;
+import static com.spud.rpic.util.CommonUtils.buildServiceMetadata;
+
 import com.spud.rpic.annotation.RpcReference;
 import com.spud.rpic.annotation.RpcService;
 import com.spud.rpic.io.netty.server.NettyNetServer;
@@ -7,13 +11,6 @@ import com.spud.rpic.model.ServiceMetadata;
 import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.registry.DefaultServiceChangeListener;
 import com.spud.rpic.registry.Registry;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.stereotype.Component;
-import org.springframework.util.ReflectionUtils;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.InetAddress;
@@ -22,8 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import static com.spud.rpic.util.CommonUtils.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.stereotype.Component;
+import org.springframework.util.ReflectionUtils;
 
 /**
  * @author Spud
@@ -148,7 +149,8 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 		});
 	}
 
-	private void scanMethodLevelServices(ApplicationContext context, List<ServiceMetadata> providers) {
+	private void scanMethodLevelServices(ApplicationContext context,
+		List<ServiceMetadata> providers) {
 		String[] beanNames = context.getBeanDefinitionNames();
 		for (String beanName : beanNames) {
 			Object bean = context.getBean(beanName);
@@ -175,7 +177,8 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 		}
 	}
 
-	private void scanParameterReferences(ApplicationContext context, List<ServiceMetadata> consumers) {
+	private void scanParameterReferences(ApplicationContext context,
+		List<ServiceMetadata> consumers) {
 		String[] beanNames = context.getBeanDefinitionNames();
 		for (String beanName : beanNames) {
 			Object bean = context.getBean(beanName);
@@ -199,7 +202,8 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 			try {
 				nettyNetServer = context.getBean(NettyNetServer.class);
 			} catch (Exception e) {
-				log.error("Failed to get NettyNetServer bean. RPC server role is set but server components are not available.",
+				log.error(
+					"Failed to get NettyNetServer bean. RPC server role is set but server components are not available.",
 					e);
 				throw new RuntimeException(
 					"NettyNetServer bean not found. Make sure RPC server dependencies are properly configured.");
@@ -225,7 +229,8 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 			if (!latch.await(30, TimeUnit.SECONDS)) {
 				throw new RuntimeException("Timeout waiting for RPC server to start");
 			}
-			log.info("Netty RPC server started successfully on port {}", rpcProperties.getServer().getPort());
+			log.info("Netty RPC server started successfully on port {}",
+				rpcProperties.getServer().getPort());
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to start Netty server", e);
 		}

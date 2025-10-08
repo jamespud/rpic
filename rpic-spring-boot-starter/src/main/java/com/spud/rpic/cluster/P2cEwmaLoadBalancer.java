@@ -1,10 +1,9 @@
 package com.spud.rpic.cluster;
 
+import com.spud.rpic.model.ServiceURL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-
-import com.spud.rpic.model.ServiceURL;
 
 /**
  * 基于P2C+EWMA的负载均衡实现。

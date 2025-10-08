@@ -2,7 +2,6 @@ package com.spud.rpic.property;
 
 import java.util.Arrays;
 import java.util.List;
-
 import lombok.Data;
 
 /**
@@ -156,7 +155,8 @@ public class RpcClientProperties {
 		/**
 		 * 若错误信息包含以下关键字则允许重试
 		 */
-		private List<String> retryOnErrorMsgContains = Arrays.asList("UNAVAILABLE", "TIMEOUT", "DEADLINE_EXCEEDED");
+		private List<String> retryOnErrorMsgContains = Arrays.asList("UNAVAILABLE", "TIMEOUT",
+			"DEADLINE_EXCEEDED");
 	}
 
 	@Data

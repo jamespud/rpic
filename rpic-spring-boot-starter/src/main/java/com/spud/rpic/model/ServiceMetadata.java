@@ -1,11 +1,10 @@
 package com.spud.rpic.model;
 
 import com.alibaba.nacos.api.naming.pojo.Instance;
-import lombok.Builder;
-import lombok.Data;
-
 import java.io.Serializable;
 import java.util.Map;
+import lombok.Builder;
+import lombok.Data;
 
 /**
  * @author Spud
@@ -112,7 +111,8 @@ public class ServiceMetadata implements Serializable {
 	public ServiceURL convertToServiceURL() {
 		// 确保协议不为null，如果未设置则使用默认值
 		String protocolToUse = protocol != null && !protocol.isEmpty() ? protocol : "rpic";
-		return new ServiceURL(host, port, interfaceName, protocolToUse, group, version, weight, parameters);
+		return new ServiceURL(host, port, interfaceName, protocolToUse, group, version, weight,
+			parameters);
 	}
 
 	public Instance convertToInstance() {

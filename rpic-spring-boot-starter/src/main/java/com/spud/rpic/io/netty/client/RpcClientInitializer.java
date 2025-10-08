@@ -6,9 +6,8 @@ import com.spud.rpic.io.netty.ProtocolEncoder;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud

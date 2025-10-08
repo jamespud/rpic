@@ -35,7 +35,8 @@ public class LoggingChannelHandler extends ChannelDuplexHandler {
 	}
 
 	@Override
-	public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+	public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise)
+		throws Exception {
 		if (msg instanceof ByteBuf) {
 			ByteBuf buf = (ByteBuf) msg;
 			log.info("[{}] SENDING: {} bytes", name, buf.readableBytes());

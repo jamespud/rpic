@@ -1,7 +1,5 @@
 package com.spud.rpic.io.netty.server;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.spud.rpic.io.netty.LoggingChannelHandler;
 import com.spud.rpic.io.netty.ProtocolDecoder;
 import com.spud.rpic.io.netty.ProtocolEncoder;
@@ -9,10 +7,10 @@ import com.spud.rpic.io.netty.server.invocation.DefaultServerInvocation;
 import com.spud.rpic.io.serializer.Serializer;
 import com.spud.rpic.io.serializer.SerializerFactory;
 import com.spud.rpic.metrics.RpcMetricsRecorder;
-
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 
 /**

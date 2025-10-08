@@ -1,9 +1,5 @@
 package com.spud.rpic.io.netty.client;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
 import com.spud.rpic.common.constants.RpcConstants;
 import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.common.exception.RpcException;
@@ -11,12 +7,14 @@ import com.spud.rpic.common.exception.TimeoutException;
 import com.spud.rpic.io.common.ProtocolMsg;
 import com.spud.rpic.io.serializer.Serializer;
 import com.spud.rpic.io.serializer.SerializerFactory;
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.ScheduledFuture;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,13 +52,15 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 	 * @param serializer    序列化器
 	 * @param masterHandler 主handler实例，用于共享pendingRequests
 	 */
-	public RpcClientHandler(Serializer serializer, SerializerFactory serializerFactory, RpcClientHandler masterHandler) {
+	public RpcClientHandler(Serializer serializer, SerializerFactory serializerFactory,
+		RpcClientHandler masterHandler) {
 		this.serializer = serializer;
 		this.serializerFactory = serializerFactory;
 		this.masterHandler = masterHandler;
 		this.pendingRequests = masterHandler.pendingRequests; // 共享pendingRequests，确保所有handler能访问同一个Map
 		this.responseSizes = masterHandler.responseSizes;
-		log.debug("Created channel-specific RpcClientHandler with shared state, serializer: {}", serializer.getType());
+		log.debug("Created channel-specific RpcClientHandler with shared state, serializer: {}",
+			serializer.getType());
 	}
 
 	@Override
@@ -138,7 +138,8 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 	 * @param eventLoop 调度超时任务的EventLoop
 	 * @param timeout   超时时间(毫秒)
 	 */
-	public void addPromise(String requestId, Promise<RpcResponse> promise, EventLoop eventLoop, int timeout) {
+	public void addPromise(String requestId, Promise<RpcResponse> promise, EventLoop eventLoop,
+		int timeout) {
 		if (eventLoop == null) {
 			log.warn("EventLoop is null, using default timeout");
 			addPromise(requestId, promise, timeout);
@@ -147,7 +148,8 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 
 		ScheduledFuture<?> timeoutFuture = eventLoop.schedule(() -> {
 			if (removePromise(requestId)) {
-				String error = String.format("Request timeout after %dms, requestId: %s", timeout, requestId);
+				String error = String.format("Request timeout after %dms, requestId: %s", timeout,
+					requestId);
 				promise.tryFailure(new TimeoutException(error));
 			}
 		}, timeout, TimeUnit.MILLISECONDS);
@@ -190,8 +192,7 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 	}
 
 	/**
-	 * 失败所有待处理的Promise（通常在严重错误时调用）
-	 * 注意：只有主Handler应该调用此方法
+	 * 失败所有待处理的Promise（通常在严重错误时调用） 注意：只有主Handler应该调用此方法
 	 */
 	public void failAllPromises(Throwable cause) {
 		if (masterHandler != null) {
@@ -233,12 +234,14 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 		try {
 			return serializerFactory.getSerializer(serializerType);
 		} catch (IllegalArgumentException ignored) {
-			log.warn("Unsupported serializer code: {}, fallback to default {}", serializerType, serializer.getType());
+			log.warn("Unsupported serializer code: {}, fallback to default {}", serializerType,
+				serializer.getType());
 			return serializer;
 		}
 	}
 
 	private static class PendingRequest {
+
 		final Promise<RpcResponse> promise;
 		final ScheduledFuture<?> timeoutFuture;
 

@@ -3,7 +3,6 @@ package com.spud.rpic.io.netty.client.invocation;
 import com.spud.rpic.common.domain.RpcRequest;
 import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.model.ServiceMetadata;
-
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -22,5 +21,6 @@ public interface ClientInvocation {
 	/**
 	 * 执行异步远程调用
 	 */
-	CompletableFuture<RpcResponse> invokeAsync(ServiceMetadata metadata, RpcRequest request, int timeout);
+	CompletableFuture<RpcResponse> invokeAsync(ServiceMetadata metadata, RpcRequest request,
+		int timeout);
 }
