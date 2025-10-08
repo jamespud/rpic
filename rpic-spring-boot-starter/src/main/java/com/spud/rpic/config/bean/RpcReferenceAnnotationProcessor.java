@@ -2,11 +2,10 @@ package com.spud.rpic.config.bean;
 
 import com.spud.rpic.annotation.RpcReference;
 import com.spud.rpic.proxy.ProxyFactory;
+import java.lang.reflect.Field;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.util.ReflectionUtils;
-
-import java.lang.reflect.Field;
 
 /**
  * @author Spud

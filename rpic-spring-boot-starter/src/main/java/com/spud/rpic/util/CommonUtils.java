@@ -3,9 +3,8 @@ package com.spud.rpic.util;
 import com.spud.rpic.annotation.RpcReference;
 import com.spud.rpic.annotation.RpcService;
 import com.spud.rpic.model.ServiceMetadata;
-import org.springframework.util.StringUtils;
-
 import java.lang.reflect.Method;
+import org.springframework.util.StringUtils;
 
 /**
  * @author Spud
@@ -35,7 +34,7 @@ public class CommonUtils {
 	}
 
 	public static ServiceMetadata buildMethodServiceMetadata(RpcService annotation, Object bean,
-	                                                         Method method) {
+		Method method) {
 		return ServiceMetadata.builder()
 			.interfaceName(getMethodServiceName(annotation, method))
 			.interfaceClass(method.getDeclaringClass())

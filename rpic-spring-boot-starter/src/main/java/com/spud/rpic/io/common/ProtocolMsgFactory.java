@@ -1,7 +1,6 @@
 package com.spud.rpic.io.common;
 
 import com.spud.rpic.io.serializer.Serializer;
-
 import java.util.concurrent.atomic.AtomicLong;
 
 /**

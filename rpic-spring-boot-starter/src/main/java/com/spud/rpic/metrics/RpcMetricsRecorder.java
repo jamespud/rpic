@@ -1,14 +1,6 @@
 package com.spud.rpic.metrics;
 
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.function.Supplier;
-
 import com.spud.rpic.property.RpcProperties;
-
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
@@ -16,6 +8,19 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
+
+/**
+ * Facade around Micrometer metrics with graceful no-op fallbacks when registry or metrics are
+ * disabled.
+ */
+public final class RpcMetricsRecorder {
+
 	private static final RpcMetricsRecorder NOOP = new RpcMetricsRecorder();
 
 	private final MeterRegistry registry;
@@ -117,8 +122,9 @@ import io.micrometer.core.instrument.Timer;
 			.description("Failed RPC client pool acquires");
 	}
 
-	private Timer.Builder configureTimer(Timer.Builder builder, double[] percentiles, Duration[] slaDurations,
-	                                     boolean publishHistogram) {
+	private Timer.Builder configureTimer(Timer.Builder builder, double[] percentiles,
+		Duration[] slaDurations,
+		boolean publishHistogram) {
 		if (percentiles.length > 0) {
 			builder.publishPercentiles(percentiles);
 		}
@@ -129,7 +135,8 @@ import io.micrometer.core.instrument.Timer;
 		return builder;
 	}
 
-	public static RpcMetricsRecorder create(MeterRegistry registry, RpcProperties.MetricsProperties properties) {
+	public static RpcMetricsRecorder create(MeterRegistry registry,
+		RpcProperties.MetricsProperties properties) {
 		if (registry == null || properties == null || !properties.isEnabled()) {
 			return NOOP;
 		}
@@ -144,13 +151,16 @@ import io.micrometer.core.instrument.Timer;
 		return enabled ? Timer.start(registry) : null;
 	}
 
-	public void recordClient(Timer.Sample sample, String service, String method, String endpoint, boolean success,
-	                         Throwable error, long requestBytes, long responseBytes) {
-		recordClient(sample, service, method, endpoint, success, error, requestBytes, responseBytes, null, null);
+	public void recordClient(Timer.Sample sample, String service, String method, String endpoint,
+		boolean success,
+		Throwable error, long requestBytes, long responseBytes) {
+		recordClient(sample, service, method, endpoint, success, error, requestBytes, responseBytes,
+			null, null);
 	}
 
-	public void recordClient(Timer.Sample sample, String service, String method, String endpoint, boolean success,
-	                         Throwable error, long requestBytes, long responseBytes, Boolean retried, Integer attempt) {
+	public void recordClient(Timer.Sample sample, String service, String method, String endpoint,
+		boolean success,
+		Throwable error, long requestBytes, long responseBytes, Boolean retried, Integer attempt) {
 		if (!enabled) {
 			return;
 		}
@@ -163,19 +173,23 @@ import io.micrometer.core.instrument.Timer;
 		}
 		clientRequestCounterBuilder.tags(merged).register(registry).increment();
 		if (!success) {
-			clientErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry).increment();
+			clientErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry)
+				.increment();
 		}
 		recordBytes(clientRequestBytesBuilder, merged, requestBytes);
 		recordBytes(clientResponseBytesBuilder, merged, responseBytes);
 	}
 
-	public void recordServer(Timer.Sample sample, String service, String method, String caller, boolean success,
-	                         Throwable error, long requestBytes, long responseBytes) {
-		recordServer(sample, service, method, caller, success, error, requestBytes, responseBytes, new Tag[0]);
+	public void recordServer(Timer.Sample sample, String service, String method, String caller,
+		boolean success,
+		Throwable error, long requestBytes, long responseBytes) {
+		recordServer(sample, service, method, caller, success, error, requestBytes, responseBytes,
+			new Tag[0]);
 	}
 
-	public void recordServer(Timer.Sample sample, String service, String method, String caller, boolean success,
-	                         Throwable error, long requestBytes, long responseBytes, Tag... extraTags) {
+	public void recordServer(Timer.Sample sample, String service, String method, String caller,
+		boolean success,
+		Throwable error, long requestBytes, long responseBytes, Tag... extraTags) {
 		if (!enabled) {
 			return;
 		}
@@ -187,7 +201,8 @@ import io.micrometer.core.instrument.Timer;
 		}
 		serverRequestCounterBuilder.tags(merged).register(registry).increment();
 		if (!success) {
-			serverErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry).increment();
+			serverErrorCounterBuilder.tags(merged).tag("error", errorTag(error)).register(registry)
+				.increment();
 		}
 		recordBytes(serverRequestBytesBuilder, merged, requestBytes);
 		recordBytes(serverResponseBytesBuilder, merged, responseBytes);
@@ -254,7 +269,8 @@ import io.micrometer.core.instrument.Timer;
 		return merged;
 	}
 
-	private Iterable<Tag> clientTags(String service, String method, String endpoint, boolean success) {
+	private Iterable<Tag> clientTags(String service, String method, String endpoint,
+		boolean success) {
 		return Tags.of(
 			"service", safeService(service),
 			"method", methodTag(method),

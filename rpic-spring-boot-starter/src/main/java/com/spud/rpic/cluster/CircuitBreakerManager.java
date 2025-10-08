@@ -1,17 +1,14 @@
 package com.spud.rpic.cluster;
 
+import com.spud.rpic.property.RpcClientProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-
-import com.spud.rpic.property.RpcClientProperties;
-
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;breaker.CircuitBreakerConfig;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 
 /**
  * 管理每个端点的熔断器。
@@ -31,7 +28,8 @@ public class CircuitBreakerManager {
 				.failureRateThreshold(properties.getFailureRateThreshold())
 				.slowCallRateThreshold(properties.getSlowCallRateThreshold())
 				.slowCallDurationThreshold(Duration.ofMillis(properties.getSlowCallDurationThresholdMs()))
-				.permittedNumberOfCallsInHalfOpenState(Math.max(1, properties.getMinimumNumberOfCalls() / 2))
+				.permittedNumberOfCallsInHalfOpenState(
+					Math.max(1, properties.getMinimumNumberOfCalls() / 2))
 				.slidingWindowSize(properties.getSlidingWindowSize())
 				.minimumNumberOfCalls(properties.getMinimumNumberOfCalls())
 				.waitDurationInOpenState(Duration.ofMillis(properties.getWaitDurationInOpenStateMs()))

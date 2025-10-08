@@ -6,7 +6,11 @@ import com.spud.rpic.model.ServiceURL;
 import com.spud.rpic.property.RpcClientProperties;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.AdaptiveRecvByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
@@ -16,8 +20,6 @@ import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.pool.FixedChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import lombok.extern.slf4j.Slf4j;
-
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud
@@ -55,7 +58,7 @@ public class ConnectionPool {
 	private final RpcMetricsRecorder metricsRecorder;
 
 	public ConnectionPool(RpcClientProperties clientProperties, RpcClientInitializer initializer,
-	                      RpcMetricsRecorder metricsRecorder) {
+		RpcMetricsRecorder metricsRecorder) {
 		this.poolProperties = clientProperties.getConnectionPoolProperties();
 		this.acquireTimeout = poolProperties.getAcquireTimeout();
 		int maxConnectionsPerAddress = poolProperties.getMaxConnectionsPerAddress() > 0
@@ -110,7 +113,8 @@ public class ConnectionPool {
 
 				log.debug("Creating new channel pool for address: {}", address);
 
-				AtomicInteger counter = connectionCounter.computeIfAbsent(address, key -> new AtomicInteger());
+				AtomicInteger counter = connectionCounter.computeIfAbsent(address,
+					key -> new AtomicInteger());
 				registerGaugeIfNecessary(address, counter);
 
 				return new FixedChannelPool(
@@ -183,7 +187,8 @@ public class ConnectionPool {
 		}
 
 		if (serviceUrl.getHost() == null || serviceUrl.getHost().isEmpty()) {
-			future.completeExceptionally(new RpcException("Service host cannot be null or empty: " + serviceUrl));
+			future.completeExceptionally(
+				new RpcException("Service host cannot be null or empty: " + serviceUrl));
 			return future;
 		}
 
@@ -193,7 +198,8 @@ public class ConnectionPool {
 		SimpleChannelPool pool = poolMap.get(address);
 		if (pool == null) {
 			recordPoolAcquireFailure(address);
-			future.completeExceptionally(new RpcException("Failed to get channel pool for address: " + address));
+			future.completeExceptionally(
+				new RpcException("Failed to get channel pool for address: " + address));
 			return future;
 		}
 
@@ -201,9 +207,11 @@ public class ConnectionPool {
 			if (channelFuture.isSuccess()) {
 				Channel channel = (Channel) channelFuture.getNow();
 				if (channel.isActive()) {
-					AtomicInteger counter = connectionCounter.computeIfAbsent(address, k -> new AtomicInteger(0));
+					AtomicInteger counter = connectionCounter.computeIfAbsent(address,
+						k -> new AtomicInteger(0));
 					counter.incrementAndGet();
-					log.debug("Successfully acquired channel async for address: {}, channel: {}", address, channel);
+					log.debug("Successfully acquired channel async for address: {}, channel: {}", address,
+						channel);
 					recordPoolAcquireSuccess(address);
 					future.complete(channel);
 				} else {
@@ -267,7 +275,8 @@ public class ConnectionPool {
 	public Map<String, Integer> getConnectionStats() {
 		Map<String, Integer> stats = new HashMap<>();
 		connectionCounter
-			.forEach((address, counter) -> stats.put(address.getHostString() + ":" + address.getPort(), counter.get()));
+			.forEach((address, counter) -> stats.put(address.getHostString() + ":" + address.getPort(),
+				counter.get()));
 		return stats;
 	}
 

@@ -1,11 +1,6 @@
 package com.spud.rpic.config;
 
 
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
-
 import com.spud.rpic.cluster.CircuitBreakerManager;
 import com.spud.rpic.cluster.EndpointStatsRegistry;
 import com.spud.rpic.cluster.LoadBalancer;
@@ -25,15 +20,19 @@ import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.proxy.CglibProxyFactory;
 import com.spud.rpic.proxy.ProxyFactory;
 import com.spud.rpic.registry.Registry;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
 
 @Slf4j
 public class RpcClientAutoConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public RpcClientHandler rpcClientHandler(Serializer serializer, SerializerFactory serializerFactory) {
+	public RpcClientHandler rpcClientHandler(Serializer serializer,
+		SerializerFactory serializerFactory) {
 		return new RpcClientHandler(serializer, serializerFactory);
 	}
 
@@ -49,7 +48,7 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 	@ConditionalOnMissingBean
 	@ConditionalOnBean({RpcClientInitializer.class})
 	public ConnectionPool connectionPool(RpcProperties properties,
-	                                     RpcClientInitializer rpcClientInitializer, RpcMetricsRecorder metricsRecorder) {
+		RpcClientInitializer rpcClientInitializer, RpcMetricsRecorder metricsRecorder) {
 		return new ConnectionPool(properties.getClient(), rpcClientInitializer, metricsRecorder);
 	}
 
@@ -57,7 +56,7 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 	@ConditionalOnMissingBean
 	@ConditionalOnBean({ConnectionPool.class, RpcClientHandler.class})
 	public NettyNetClient rpcClient(ConnectionPool connectionPool,
-	                                RpcClientHandler rpcClientHandler, RpcMetricsRecorder metricsRecorder) {
+		RpcClientHandler rpcClientHandler, RpcMetricsRecorder metricsRecorder) {
 		return new NettyNetClient(connectionPool, rpcClientHandler, metricsRecorder);
 	}
 
@@ -81,16 +80,17 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public LoadBalancer loadBalancer(RpcProperties properties, LoadBalancerFactory loadBalancerFactory) {
+	public LoadBalancer loadBalancer(RpcProperties properties,
+		LoadBalancerFactory loadBalancerFactory) {
 		return loadBalancerFactory.getLoadBalancer(properties.getClient().getLoadbalance());
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
 	public ClientInvocation clientInvocation(Registry registry, LoadBalancer loadBalancer,
-	                                         NettyNetClient nettyNetClient, RpcProperties properties,
-	                                         CircuitBreakerManager circuitBreakerManager,
-	                                         EndpointStatsRegistry endpointStatsRegistry) {
+		NettyNetClient nettyNetClient, RpcProperties properties,
+		CircuitBreakerManager circuitBreakerManager,
+		EndpointStatsRegistry endpointStatsRegistry) {
 		return new DefaultClientInvocation(registry, loadBalancer, nettyNetClient,
 			properties.getClient(), circuitBreakerManager, endpointStatsRegistry);
 	}

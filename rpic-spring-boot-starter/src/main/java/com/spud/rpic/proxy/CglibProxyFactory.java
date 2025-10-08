@@ -2,12 +2,11 @@ package com.spud.rpic.proxy;
 
 import com.spud.rpic.annotation.RpcReference;
 import com.spud.rpic.io.netty.client.invocation.ClientInvocation;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Spud

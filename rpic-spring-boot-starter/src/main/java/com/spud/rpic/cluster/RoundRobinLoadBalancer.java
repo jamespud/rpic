@@ -1,7 +1,6 @@
 package com.spud.rpic.cluster;
 
 import com.spud.rpic.model.ServiceURL;
-
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 

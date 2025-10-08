@@ -1,7 +1,6 @@
 package com.spud.rpic.registry;
 
 import com.spud.rpic.model.ServiceURL;
-
 import java.util.List;
 
 /**

@@ -19,26 +19,22 @@ public class RpcConstants {
 	public static final byte PROTOCOL_VERSION = 1;
 
 	/**
-	 * 请求消息类型 (1)
-	 * 必须与MessageType.REQUEST一致
+	 * 请求消息类型 (1) 必须与MessageType.REQUEST一致
 	 */
 	public static final byte TYPE_REQUEST = 0x1;
 
 	/**
-	 * 响应消息类型 (2)
-	 * 必须与MessageType.RESPONSE一致
+	 * 响应消息类型 (2) 必须与MessageType.RESPONSE一致
 	 */
 	public static final byte TYPE_RESPONSE = 0x2;
 
 	/**
-	 * 心跳消息类型 (3)
-	 * 必须与MessageType.HEARTBEAT一致
+	 * 心跳消息类型 (3) 必须与MessageType.HEARTBEAT一致
 	 */
 	public static final byte TYPE_HEARTBEAT = 0x3;
 
 	/**
-	 * 错误消息类型 (4)
-	 * 必须与MessageType.HEARTBEAT_RESPONSE一致
+	 * 错误消息类型 (4) 必须与MessageType.HEARTBEAT_RESPONSE一致
 	 */
 	public static final byte TYPE_ERROR = 0x4;
 

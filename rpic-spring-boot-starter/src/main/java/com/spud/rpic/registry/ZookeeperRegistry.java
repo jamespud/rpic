@@ -7,13 +7,6 @@ import com.spud.rpic.model.ServiceMetadata;
 import com.spud.rpic.model.ServiceURL;
 import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.util.NetUtils;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.recipes.cache.CuratorCache;
-import org.apache.curator.retry.ExponentialBackoffRetry;
-import org.apache.zookeeper.CreateMode;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +18,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.cache.CuratorCache;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.CreateMode;
 
 /**
  * @author Spud
@@ -80,9 +79,8 @@ public class ZookeeperRegistry extends Registry {
 	}
 
 	/**
-	 * 注册服务
-	 * ZooKeeperConstants.ZK_REGISTRY_PATH + "/" + serviceMetadata.getServiceName()
-	 * +"/" + serviceMetadata.getVersion()
+	 * 注册服务 ZooKeeperConstants.ZK_REGISTRY_PATH + "/" + serviceMetadata.getServiceName() +"/" +
+	 * serviceMetadata.getVersion()
 	 * /services/com.spud.rpc.service.HelloService/1.0.0/instance-2/127.0.0.1/8080
 	 */
 	@Override
@@ -121,11 +119,13 @@ public class ZookeeperRegistry extends Registry {
 				.forPath(instancePath, data);
 
 			registrationCache.put(metadata, true);
-			log.info("Successfully registered service: {} at path: {}", metadata.getServiceKey(), instancePath);
+			log.info("Successfully registered service: {} at path: {}", metadata.getServiceKey(),
+				instancePath);
 		} catch (Exception e) {
 			registrationCache.invalidate(metadata);
 			throw new RuntimeException(
-				"Failed to register service: " + metadata.getServiceKey() + ", error: " + e.getMessage(), e);
+				"Failed to register service: " + metadata.getServiceKey() + ", error: " + e.getMessage(),
+				e);
 		}
 	}
 
@@ -199,7 +199,8 @@ public class ZookeeperRegistry extends Registry {
 						.forPath(servicePath);
 					log.info("Created service path for subscription: {}", servicePath);
 				} catch (Exception e) {
-					log.warn("Failed to create service path: {}, might be created by another client", servicePath);
+					log.warn("Failed to create service path: {}, might be created by another client",
+						servicePath);
 					// 忽略可能的并发创建异常
 				}
 			}

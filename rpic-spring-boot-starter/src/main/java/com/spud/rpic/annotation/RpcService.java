@@ -1,11 +1,10 @@
 package com.spud.rpic.annotation;
 
-import org.springframework.stereotype.Component;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.springframework.stereotype.Component;
 
 /**
  * @author Spud
@@ -15,6 +14,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Component
 public @interface RpcService {
+
 	// 服务接口类型，默认为void.class表示使用实现类的第一个接口
 	Class<?> interfaceClass() default void.class;
 

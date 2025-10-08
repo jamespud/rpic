@@ -1,14 +1,5 @@
 package com.spud.rpic.config;
 
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import com.spud.rpic.config.bean.ServiceStarter;
 import com.spud.rpic.io.netty.server.NettyNetServer;
 import com.spud.rpic.io.netty.server.RpcServerHandler;
@@ -19,8 +10,15 @@ import com.spud.rpic.io.serializer.SerializerFactory;
 import com.spud.rpic.metrics.RpcMetricsRecorder;
 import com.spud.rpic.property.RpcProperties;
 import com.spud.rpic.registry.Registry;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * @author Spud
@@ -48,10 +46,12 @@ public class RpcServerAutoConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public RpcServerHandler rpcServerHandler(Serializer serializer, SerializerFactory serializerFactory,
-	                                         DefaultServerInvocation defaultServerInvocation,
-	                                         RpcMetricsRecorder metricsRecorder) {
-		return new RpcServerHandler(serializer, serializerFactory, defaultServerInvocation, metricsRecorder);
+	public RpcServerHandler rpcServerHandler(Serializer serializer,
+		SerializerFactory serializerFactory,
+		DefaultServerInvocation defaultServerInvocation,
+		RpcMetricsRecorder metricsRecorder) {
+		return new RpcServerHandler(serializer, serializerFactory, defaultServerInvocation,
+			metricsRecorder);
 	}
 
 	@Bean
@@ -65,7 +65,7 @@ public class RpcServerAutoConfiguration implements DisposableBean {
 	@Bean
 	@ConditionalOnMissingBean
 	public NettyNetServer rpcServer(RpcProperties properties,
-	                                RpcServerInitializer serverInitializer) {
+		RpcServerInitializer serverInitializer) {
 		return new NettyNetServer(properties, serverInitializer);
 	}
 

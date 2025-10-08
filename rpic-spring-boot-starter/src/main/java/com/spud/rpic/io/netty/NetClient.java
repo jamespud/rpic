@@ -3,7 +3,6 @@ package com.spud.rpic.io.netty;
 import com.spud.rpic.common.domain.RpcRequest;
 import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.model.ServiceURL;
-
 import java.util.concurrent.CompletableFuture;
 
 /**

@@ -7,11 +7,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.util.AttributeKey;
-import lombok.extern.slf4j.Slf4j;
-
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Spud
@@ -62,7 +61,8 @@ public class RpcChannelPoolHandler extends AbstractChannelPoolHandler {
 			sharedHandler.getSerializerFactory(), sharedHandler);
 		pipeline.addLast(handlerName, channelHandler);
 
-		log.debug("Channel created: {}, remote address: {}, handler: {}", ch, remoteAddress, handlerName);
+		log.debug("Channel created: {}, remote address: {}, handler: {}", ch, remoteAddress,
+			handlerName);
 		ch.attr(LAST_ACCESS_TIME).set(System.nanoTime());
 	}
 

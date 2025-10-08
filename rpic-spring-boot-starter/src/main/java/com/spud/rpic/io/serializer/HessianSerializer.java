@@ -3,7 +3,6 @@ package com.spud.rpic.io.serializer;
 import com.caucho.hessian.io.HessianInput;
 import com.caucho.hessian.io.HessianOutput;
 import com.spud.rpic.common.exception.SerializeException;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 

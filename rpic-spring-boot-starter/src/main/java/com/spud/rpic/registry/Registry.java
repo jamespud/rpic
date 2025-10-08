@@ -4,10 +4,9 @@ import com.spud.rpic.model.ServiceMetadata;
 import com.spud.rpic.model.ServiceURL;
 import com.spud.rpic.registry.cache.CaffeineCache;
 import com.spud.rpic.registry.cache.RpcCache;
-import org.springframework.beans.factory.DisposableBean;
-
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.DisposableBean;
 
 /**
  * @author Spud
@@ -31,7 +30,7 @@ public abstract class Registry implements DisposableBean {
 	}
 
 	protected Registry(long discoveryTtl, long discoveryRefreshInterval, long registrationTtl,
-	                   long registrationRefreshInterval) {
+		long registrationRefreshInterval) {
 		this.registrationCache = new CaffeineCache<>(builder ->
 			builder.expireAfterWrite(registrationTtl, TimeUnit.MINUTES)
 				.refreshAfterWrite(registrationRefreshInterval, TimeUnit.MINUTES)
@@ -57,7 +56,7 @@ public abstract class Registry implements DisposableBean {
 	public abstract void subscribe(ServiceMetadata serviceMetadata, ServiceChangeListener listener);
 
 	public abstract void subscribe(List<ServiceMetadata> serviceMetadata,
-	                               ServiceChangeListener listener);
+		ServiceChangeListener listener);
 
 	public final List<ServiceURL> refreshDiscover(ServiceMetadata metadata) {
 		return discoveryCache.get(metadata.getServiceId(),

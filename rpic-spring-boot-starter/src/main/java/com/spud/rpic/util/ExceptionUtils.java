@@ -2,7 +2,6 @@ package com.spud.rpic.util;
 
 import com.spud.rpic.common.exception.RemoteException;
 import com.spud.rpic.common.exception.RpcException;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -19,7 +18,7 @@ public class ExceptionUtils {
 	public static String getStackTrace(Throwable throwable) throws IOException {
 
 		try (StringWriter sw = new StringWriter();
-		     PrintWriter pw = new PrintWriter(sw)) {
+			PrintWriter pw = new PrintWriter(sw)) {
 			throwable.printStackTrace(pw);
 			return sw.toString();
 		}

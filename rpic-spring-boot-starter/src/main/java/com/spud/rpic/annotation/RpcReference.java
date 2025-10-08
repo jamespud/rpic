@@ -12,6 +12,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RpcReference {
+
 	// 服务接口类型，可以省略
 	Class<?> interfaceClass() default void.class;
 

@@ -1,11 +1,10 @@
 package com.spud.rpic.model;
 
-import lombok.Data;
-
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.Data;
 
 /**
  * @author Spud
@@ -63,7 +62,7 @@ public class ServiceURL implements Serializable {
 	}
 
 	public ServiceURL(String host, int port, String interfaceName, String protocol, String group,
-	                  String version, Integer weight, Map<String, String> parameters) {
+		String version, Integer weight, Map<String, String> parameters) {
 		this.host = host;
 		this.port = port;
 		this.interfaceName = interfaceName;

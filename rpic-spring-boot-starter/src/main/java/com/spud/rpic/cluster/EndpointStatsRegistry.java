@@ -1,10 +1,9 @@
 package com.spud.rpic.cluster;
 
+import com.spud.rpic.property.RpcClientProperties;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.spud.rpic.property.RpcClientProperties;ies;
 
 /**
  * 维护客户端侧端点统计，用于负载均衡与异常节点剔除。
