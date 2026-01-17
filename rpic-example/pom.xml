@@ -23,11 +23,6 @@
   </properties>
   
   <dependencies>
-    <dependency>
-      <groupId>com.spud.rpic</groupId>
-      <artifactId>rpic-spring-boot-starter</artifactId>
-      <version>1.0-SNAPSHOT</version>
-    </dependency>
   </dependencies>
 
 </project>
