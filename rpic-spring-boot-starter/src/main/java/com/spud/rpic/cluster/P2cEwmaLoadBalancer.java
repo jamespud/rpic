@@ -7,6 +7,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 基于P2C+EWMA的负载均衡实现。
+ * <p>
+ * P2C (Pick Two Choices) 算法通过随机选择两个节点并比较它们的 EWMA (Exponentially Weighted Moving Average)
+ * 延迟来选择更好的节点，平衡了性能和随机性。
  */
 public class P2cEwmaLoadBalancer implements LoadBalancer {
 
@@ -34,16 +37,19 @@ public class P2cEwmaLoadBalancer implements LoadBalancer {
 			candidates = urls;
 		}
 
-		if (candidates.size() == 1) {
+		int candidateSize = candidates.size();
+		if (candidateSize == 1) {
 			return candidates.get(0);
 		}
 
-		ServiceURL first = randomPick(candidates);
-		ServiceURL second = randomPick(candidates);
-		if (second == first && candidates.size() > 1) {
-			int index = (candidates.indexOf(first) + 1) % candidates.size();
-			second = candidates.get(index);
+		int index1 = ThreadLocalRandom.current().nextInt(candidateSize);
+		int index2 = ThreadLocalRandom.current().nextInt(candidateSize);
+		if (index1 == index2) {
+			index2 = (index1 + 1) % candidateSize;
 		}
+
+		ServiceURL first = candidates.get(index1);
+		ServiceURL second = candidates.get(index2);
 
 		return better(first, second);
 	}
@@ -53,10 +59,6 @@ public class P2cEwmaLoadBalancer implements LoadBalancer {
 		return LoadBalancerType.P2C_EWMA.getType();
 	}
 
-	private ServiceURL randomPick(List<ServiceURL> list) {
-		return list.get(ThreadLocalRandom.current().nextInt(list.size()));
-	}
-
 	private ServiceURL better(ServiceURL a, ServiceURL b) {
 		if (a == null) {
 			return b;
@@ -64,8 +66,10 @@ public class P2cEwmaLoadBalancer implements LoadBalancer {
 		if (b == null) {
 			return a;
 		}
-		double scoreA = score(a);
-		double scoreB = score(b);
+
+		double scoreA = calculateScore(a);
+		double scoreB = calculateScore(b);
+
 		if (Double.isNaN(scoreA) && Double.isNaN(scoreB)) {
 			return ThreadLocalRandom.current().nextBoolean() ? a : b;
 		}
@@ -75,18 +79,30 @@ public class P2cEwmaLoadBalancer implements LoadBalancer {
 		if (Double.isNaN(scoreB)) {
 			return a;
 		}
+
 		return scoreA <= scoreB ? a : b;
 	}
 
-	private double score(ServiceURL url) {
+	/**
+	 * 计算服务的综合分数
+	 * <p>
+	 * 分数由两部分组成：
+	 * 1. EWMA 延迟（主要指标）
+	 * 2. 服务权重（当没有延迟数据时作为备用）
+	 * <p>
+	 * 分数越低表示服务质量越好
+	 */
+	private double calculateScore(ServiceURL url) {
 		double ewma = endpointStatsRegistry.getLatencyScore(url.getAddress());
-		if (Double.isNaN(ewma) || ewma <= 0) {
-			Integer weight = url.getWeight();
-			if (weight != null && weight > 0) {
-				return 1.0d / weight;
-			}
-			return Double.MAX_VALUE;
+		if (!Double.isNaN(ewma) && ewma > 0) {
+			return ewma;
 		}
-		return ewma;
+
+		Integer weight = url.getWeight();
+		if (weight != null && weight > 0) {
+			return 1.0d / weight;
+		}
+
+		return Double.MAX_VALUE;
 	}
 }

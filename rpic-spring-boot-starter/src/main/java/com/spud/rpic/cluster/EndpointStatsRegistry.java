@@ -4,6 +4,7 @@ import com.spud.rpic.property.RpcClientProperties;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.DoubleAdder;
 
 /**
  * 维护客户端侧端点统计，用于负载均衡与异常节点剔除。
@@ -46,8 +47,25 @@ public class EndpointStatsRegistry {
 		return stats != null ? stats.getEwmaLatency() : Double.NaN;
 	}
 
+	/**
+	 * 获取端点的请求计数
+	 */
+	public long getRequestCount(String endpoint) {
+		Stats stats = statsMap.get(endpoint);
+		return stats != null ? stats.getRequestCount() : 0;
+	}
+
+	/**
+	 * 获取端点的失败计数
+	 */
+	public long getFailureCount(String endpoint) {
+		Stats stats = statsMap.get(endpoint);
+		return stats != null ? stats.getFailureCount() : 0;
+	}
+
 	private static final class Stats {
 
+		private final Object ewmaLock = new Object();
 		private double ewmaLatency;
 		private final AtomicLong requestCount = new AtomicLong();
 		private final AtomicLong failureCount = new AtomicLong();
@@ -91,17 +109,29 @@ public class EndpointStatsRegistry {
 		}
 
 		double getEwmaLatency() {
-			return ewmaLatency;
+			synchronized (ewmaLock) {
+				return ewmaLatency;
+			}
+		}
+
+		long getRequestCount() {
+			return requestCount.get();
+		}
+
+		long getFailureCount() {
+			return failureCount.get();
 		}
 
 		private void updateEwma(long latencyMs) {
 			if (latencyMs <= 0) {
 				latencyMs = 1;
 			}
-			if (ewmaLatency <= 0) {
-				ewmaLatency = latencyMs;
-			} else {
-				ewmaLatency = ewmaLatency * (1 - DEFAULT_EWMA_ALPHA) + latencyMs * DEFAULT_EWMA_ALPHA;
+			synchronized (ewmaLock) {
+				if (ewmaLatency <= 0) {
+					ewmaLatency = latencyMs;
+				} else {
+					ewmaLatency = ewmaLatency * (1 - DEFAULT_EWMA_ALPHA) + latencyMs * DEFAULT_EWMA_ALPHA;
+				}
 			}
 		}
 	}
