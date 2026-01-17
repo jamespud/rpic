@@ -46,12 +46,6 @@ public class ProtocolMsg {
 	/**
 	 * 消息头长度：1(魔数) + 1(版本号) + 1(消息类型) + 1(序列化类型) + 4(内容长度)。
 	 */
-	public static final int HEADER_LENGTH = 1 + 1 + 1 + 1 + 4;
-
-	/**
-	 * 最大片段长度，默认 8MB。
-	 */
-	public static final int MAX_FRAME_LENGTH = 8 * 1024 * 1024;
 
 	public static ProtocolMsg fromBytes(byte[] bytes, byte type, byte serializerType) {
 		return new ProtocolMsg(RpcConstants.PROTOCOL_MAGIC_NUMBER, RpcConstants.PROTOCOL_VERSION,
