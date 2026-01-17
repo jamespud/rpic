@@ -1,164 +1,273 @@
-## RPC框架执行流程分析
+# RPIC - 高性能 RPC 框架
 
-### 一、生产者（服务提供方）执行流程
+RPIC 是一个基于 Spring Boot 和 Netty 构建的高性能 RPC（远程过程调用）框架，提供了完整的微服务通信解决方案，包括服务注册发现、负载均衡、容错机制和可观测性。
 
-1. **服务定义与注册**
-    - 使用`@RpcService`注解标记服务实现类，定义服务接口、版本、分组等信息
-    - Spring容器启动后，`ServiceStarter`类监听`ContextRefreshedEvent`事件
-    - 扫描所有带有`@RpcService`注解的Bean，收集服务元数据（ServiceMetadata）
-    - 将服务元数据注册到注册中心（支持Zookeeper和Nacos）
+## 技术栈
 
-2. **服务启动**
-    - 启动Netty服务器（NettyNetServer）监听指定端口
-    - 初始化`RpcServerInitializer`和`RpcServerHandler`处理客户端请求
-    - 服务启动后等待客户端连接和调用
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Spring Boot | 2.7.10 | 自动配置、依赖注入 |
+| Netty | 4.2.6.Final | 高性能网络通信 |
+| Nacos | 3.1.0 | 服务注册发现 |
+| ZooKeeper | 3.9.4 | 服务注册发现 |
+| CGLIB | 3.3.0 | 动态代理 |
+| Kryo | 5.6.2 | 序列化 |
+| Resilience4j | 2.3.0 | 熔断器 |
+| Micrometer | 1.9.11 | 指标收集 |
+| Prometheus | - | 指标存储 |
+| OpenTelemetry | 1.32.0 | 分布式追踪 |
 
-3. **请求处理流程**
-    - 客户端请求到达后，首先由Netty解码器解析协议消息（ProtocolMsg）
-    - `RpcServerHandler`处理解码后的消息，反序列化为`RpcRequest`对象
-    - 调用`DefaultServerInvocation`执行实际服务调用：
-        1. 验证请求有效性
-        2. 通过反射获取目标服务实例和方法
-        3. 执行方法调用
-        4. 将调用结果封装为`RpcResponse`
-        5. 序列化响应并返回给客户端
+## 快速开始
 
-4. **并发控制**
-    - 使用信号量（Semaphore）控制最大并发请求数
-    - 当请求超过限制时，快速返回错误响应
+### 环境要求
 
-5. **方法缓存**
-    - 使用`methodCache`缓存已解析的方法，提高反射性能
+- JDK 8+
+- Maven 3.6+
+- ZooKeeper 3.9.4+ 或 Nacos 3.1.0+
 
-### 二、消费者（服务调用方）执行流程
+### 安装与运行
 
-1. **服务引用和发现**
-    - 使用`@RpcReference`注解标记需要远程调用的接口
-    - `RpcReferenceAnnotationProcessor`实现`BeanPostProcessor`接口
-    - 在Bean初始化前，扫描带有`@RpcReference`注解的字段
-    - 为每个引用创建动态代理对象，并注入到相应字段
+#### 1. 克隆项目
 
-2. **代理创建**
-    - 使用Cglib创建动态代理（CglibProxyFactory）
-    - 代理对象拦截所有方法调用，转发到`RpcInvocationHandler`
-
-3. **远程调用流程**
-    - 当调用代理对象方法时，`RpcInvocationHandler.intercept`方法被触发：
-        1. 构建RPC请求（RpcRequest）包含接口名、方法名、参数等
-        2. 构建服务元数据（ServiceMetadata）
-        3. 调用`ClientInvocation.invoke`执行远程调用
-
-4. **服务发现和负载均衡**
-    - 从注册中心获取服务实例列表（默认缓存一段时间）
-    - 通过负载均衡策略选择一个服务实例
-    - 支持失败重试机制，可配置重试次数
-
-5. **网络通信**
-    - 通过`NettyNetClient`建立与服务端的连接
-    - 使用连接池（ConnectionPool）管理和复用连接
-    - 发送序列化后的请求并等待响应
-    - 处理响应结果并返回
-
-6. **异常处理**
-    - 捕获并处理网络超时、服务不可用等异常
-    - 支持重试机制，失败后尝试其他服务实例
-
-### 三、关键组件详解
-
-1. **注册中心（Registry）**
-    - 抽象接口设计，支持多种实现（ZookeeperRegistry、NacosRegistry）
-    - 提供服务注册、发现、订阅功能
-    - 使用缓存机制（CaffeineCache）提高服务发现性能
-    - 支持服务变更通知机制（ServiceChangeListener）
-
-2. **序列化机制**
-    - 支持多种序列化协议（Jackson、Hessian、Kryo）
-    - 通过Serializer接口统一抽象
-
-3. **负载均衡（LoadBalancer）**
-    - 选择合适的服务实例进行调用
-    - 支持排除已尝试失败的实例
-
-4. **网络通信**
-    - 基于Netty实现高性能网络通信
-    - 自定义协议消息格式（ProtocolMsg）
-    - 客户端支持连接池和请求合并
-
-5. **Spring集成**
-    - 通过Spring Boot自动配置简化使用
-    - `RpcServerAutoConfiguration`配置服务端
-    - `RpcClientAutoConfiguration`配置客户端
-    - 支持通过配置文件定制RPC行为
-
-### 四、完整调用流程
-
-#### 生产者端：
-1. 标记服务类或方法为`@RpcService`
-2. Spring启动时自动注册服务到注册中心
-3. 启动Netty服务器监听请求
-4. 收到请求后反序列化、查找服务实现、执行调用
-5. 序列化结果并返回响应
-
-#### 消费者端：
-1. 在类中使用`@RpcReference`注解引用远程服务
-2. Spring启动时创建动态代理并注入到引用字段
-3. 调用服务方法时，代理拦截调用并构建RPC请求
-4. 从注册中心发现服务地址，选择一个实例
-5. 发送请求到服务实例并等待响应
-6. 处理响应结果（成功返回结果，失败抛出异常）
-
-### 五、观测性（Metrics）
-
-启用 Micrometer（如 Spring Boot Actuator + Prometheus）后，框架会自动输出以下指标，所有指标默认携带 `service`、`method`（可按配置关闭高基数）、以及 `success` 等标签：
-
-| 指标名称 | 说明 | 标签补充 |
-| --- | --- | --- |
-| `rpic.client.latency` | 客户端调用耗时直方图 | `endpoint` = 目标节点 |
-| `rpic.client.requests` / `rpic.client.errors` | 客户端请求总数 / 失败总数 | `error` = 异常类型（失败时） |
-| `rpic.client.request.bytes` / `rpic.client.response.bytes` | 客户端请求/响应负载大小 | - |
-| `rpic.client.pool.acquire` / `rpic.client.pool.acquire.errors` | 连接池获取成功/失败次数 | `endpoint` |
-| `rpic.client.pool.active` | 每个节点的活动连接数 Gauge | `endpoint` |
-| `rpic.server.latency` | 服务端处理耗时直方图 | `caller` = 调用方地址 |
-| `rpic.server.requests` / `rpic.server.errors` | 服务端请求总数 / 失败总数 | `error` |
-| `rpic.server.request.bytes` / `rpic.server.response.bytes` | 服务端接收/发送负载大小 | - |
-
-> 提示：可通过 `rpc.metrics.enabled=false` 关闭指标；`rpc.metrics.high-cardinality-tags-enabled=false` 可避免方法级高基数标签。
-
-### 六、Phase 1 客户端稳健性增强
-
-- **端到端 Deadline**：客户端在单次调用开始时写入 `deadlineAtMillis`，每次重试只消耗剩余时间；服务端若检测到请求已过期会直接返回超时响应，避免无意义的业务执行。
-- **指数退避重试**：支持全抖动（full jitter）的指数回退策略，可按异常类型与关键字白名单决定是否重试，默认最大 3 次尝试。
-- **熔断与异常实例剔除**：基于 Resilience4j 的每端点熔断器叠加 EWMA/失败率统计，自动隔离高错误率或高延迟节点并定期探活。
-- **P2C+EWMA 负载均衡**：新增 `p2c_ewma` 策略，使用“二选一”+延迟指数滑动平均选择更健康的节点，默认示例已启用。
-- **指标补充标签**：客户端指标新增 `retried`（低基数）与可选 `attempt`（受高基数开关控制）标签，便于追踪重试行为。
-
-示例配置（位于 `rpic-example-simple/simple-client/application.yml`）：
-
-```yaml
-rpc:
-    client:
-        loadbalance: p2c_ewma
-        retry:
-            enabled: true
-            max-attempts: 3
-            base-delay-ms: 50
-            max-delay-ms: 1000
-            multiplier: 2.0
-            jitter-factor: 1.0
-        circuit-breaker:
-            enabled: true
-            failure-rate-threshold: 50
-            slow-call-rate-threshold: 50
-            slow-call-duration-threshold-ms: 1000
-            sliding-window-size: 100
-            minimum-number-of-calls: 50
-            wait-duration-in-open-state-ms: 10000
-        outlier:
-            enabled: true
-            error-rate-threshold: 0.5
-            min-request-volume: 50
-            ejection-duration-ms: 30000
-            probe-interval-ms: 5000
+```bash
+git clone https://github.com/your-username/rpic.git
+cd rpic
 ```
 
-> 验证建议：在示例 server 端模拟部分节点故障或注入延迟，观察客户端重试日志与 `retried=true` 指标计数；通过 Actuator 暴露的 Micrometer 指标对比熔断/剔除前后的端点延迟情况。
+#### 2. 安装依赖
+
+```bash
+mvn clean install -DskipTests
+```
+
+#### 3. 启动 ZooKeeper
+
+```bash
+# 下载并启动 ZooKeeper
+wget https://archive.apache.org/dist/zookeeper/zookeeper-3.9.4/apache-zookeeper-3.9.4-bin.tar.gz
+tar -xzf apache-zookeeper-3.9.4-bin.tar.gz
+cd apache-zookeeper-3.9.4-bin
+bin/zkServer.sh start
+```
+
+#### 4. 运行示例
+
+**启动服务端：**
+```bash
+cd rpic-example/rpic-example-simple/simple-server
+mvn spring-boot:run
+```
+
+**启动客户端：**
+```bash
+cd rpic-example/rpic-example-simple/simple-client
+mvn spring-boot:run
+```
+
+## 核心功能
+
+### 1. 服务定义与注解驱动开发
+
+#### @RpcService（服务提供者）
+```java
+@Service
+@RpcService(version = "1.0.0", weight = 10, timeout = 5000)
+public class HelloServiceImpl implements HelloService {
+    public String sayHello(String name) {
+        return "Hello, " + name + "!";
+    }
+}
+```
+
+#### @RpcReference（服务消费者）
+```java
+@RpcReference(version = "1.0.0", loadbalance = "p2c_ewma", retries = 2)
+private HelloService helloService;
+```
+
+### 2. 服务注册与发现
+
+- **抽象 Registry 接口**：统一服务注册发现接口
+- **支持的注册中心**：NacosRegistry、ZookeeperRegistry
+- **缓存机制**：使用 Caffeine 缓存，支持配置 TTL 和刷新间隔
+
+### 3. 高性能网络通信（Netty）
+
+#### 自定义协议设计
+```
+┌────────┬──────┬──────┬───────────┬──────────┬──────────┐
+│ Magic  │ Ver  │ Type │ Serializer│  Length  │  Content │
+│ (1byte)│(1byte)│(1byte)│  (1byte)  │ (4bytes) │ (N bytes)│
+└────────┴──────┴──────┴───────────┴──────────┴──────────┘
+```
+
+### 4. 负载均衡与容错
+
+#### 负载均衡策略
+- **P2C+EWMA**：基于延迟的负载均衡（默认推荐）
+- **Random**：随机选择
+- **RoundRobin**：轮询
+- **WeightedRandom**：加权随机
+- **WeightedRoundRobin**：加权轮询
+
+#### 容错机制
+1. **熔断器（Resilience4j）**
+2. **异常节点剔除（Outlier Ejection）**
+3. **指数退避重试**
+
+### 5. RPC 调用流程
+
+**CGLIB 动态代理**：
+```java
+public class RpcInvocationHandler implements MethodInterceptor {
+    @Override
+    public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy) {
+        // 1. 处理 Object 方法
+        // 2. 构建 RPC 请求
+        // 3. 处理同步/异步调用
+        // 4. 异常处理
+    }
+}
+```
+
+### 6. 可观测性
+
+#### Metrics（Micrometer）
+- **客户端指标**：`rpic.client.latency`、`rpic.client.requests`、`rpic.client.errors` 等
+- **服务端指标**：`rpic.server.latency`、`rpic.server.requests`、`rpic.server.errors` 等
+- **熔断器指标**：`rpic.circuitbreaker.state`、`rpic.circuitbreaker.failure.rate` 等
+
+#### Tracing（OpenTelemetry）
+- 支持分布式链路追踪
+- 自动注入 Span 上下文
+
+## 使用方法
+
+### 配置文件
+
+**application.yml（客户端）：**
+```yaml
+rpc:
+  role: client
+  applicationName: my-app
+  serializeType: kryo
+  compressType: none
+  registry:
+    type: zookeeper
+    address: localhost:2181
+  client:
+    loadbalance: p2c_ewma
+    timeout: 5000
+    retry:
+      enabled: true
+      maxAttempts: 3
+    circuit-breaker:
+      enabled: true
+      failureRateThreshold: 50
+    outlier:
+      enabled: true
+      errorRateThreshold: 0.5
+```
+
+**application.yml（服务端）：**
+```yaml
+rpc:
+  role: server
+  server:
+    port: 9090
+  registry:
+    type: zookeeper
+    address: localhost:2181
+```
+
+### 代码示例
+
+**服务端：**
+```java
+@Service
+@RpcService(version = "1.0.0", weight = 10)
+public class HelloServiceImpl implements HelloService {
+    public String sayHello(String name) {
+        return "Hello, " + name + "!";
+    }
+
+    public CompletableFuture<String> sayHelloAsync(String name) {
+        return CompletableFuture.supplyAsync(() -> sayHello(name));
+    }
+}
+```
+
+**客户端：**
+```java
+@SpringBootApplication
+public class ConsumerApplication implements CommandLineRunner {
+
+    @RpcReference(version = "1.0.0")
+    private HelloService helloService;
+
+    public void run(String... args) {
+        // 同步调用
+        String result = helloService.sayHello("World");
+
+        // 异步调用
+        helloService.sayHelloAsync("World")
+            .thenAccept(r -> System.out.println("异步结果: " + r));
+    }
+}
+```
+
+## 架构设计
+
+### 整体架构
+
+项目采用 Maven 多模块结构：
+- **rpic-spring-boot-starter**：核心 RPC 框架
+- **rpic-example**：示例应用，包含服务端、客户端和 API 模块
+
+### 核心组件
+
+1. **服务定义与注解层**：@RpcService、@RpcReference
+2. **服务注册与发现**：Registry 接口、ZookeeperRegistry、NacosRegistry
+3. **网络通信**：NettyNetClient、NettyNetServer、ProtocolMsg
+4. **RPC 调用**：RpcInvocationHandler、DefaultClientInvocation、DefaultServerInvocation
+5. **负载均衡**：LoadBalancer、P2CEWMALoadBalancer
+6. **容错机制**：CircuitBreakerManager、EndpointStatsRegistry
+7. **可观测性**：RpcMetricsRecorder、RpcTracer
+
+## 贡献指南
+
+### 开发流程
+
+1. Fork 项目
+2. 创建功能分支：`git checkout -b feature/your-feature`
+3. 提交修改：`git commit -m "Add your feature"`
+4. 推送到分支：`git push origin feature/your-feature`
+5. 提交 Pull Request
+
+### 代码规范
+
+- 使用 Java 8+ 语法
+- 遵循 Spring Boot 代码风格
+- 注释清晰，文档完整
+- 编写单元测试
+
+### 常用命令
+
+```bash
+# 编译项目
+mvn compile
+
+# 运行测试
+mvn test
+
+# 打包项目
+mvn clean package -DskipTests
+
+# 运行示例
+cd rpic-example/rpic-example-simple/simple-server
+mvn spring-boot:run
+```
+
+## 许可证
+
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
