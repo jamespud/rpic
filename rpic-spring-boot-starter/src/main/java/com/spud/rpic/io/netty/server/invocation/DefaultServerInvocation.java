@@ -3,6 +3,7 @@ package com.spud.rpic.io.netty.server.invocation;
 import com.spud.rpic.common.domain.RpcRequest;
 import com.spud.rpic.common.domain.RpcResponse;
 import com.spud.rpic.common.exception.RpcException;
+import com.spud.rpic.property.RpcServerProperties;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -25,9 +26,14 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
 
 	private final Map<String, Method> methodCache = new ConcurrentHashMap<>();
 
-	private final int maxConcurrentRequests = 100;
+	private final int maxConcurrentRequests;
 
-	private final Semaphore semaphore = new Semaphore(maxConcurrentRequests);
+	private final Semaphore semaphore;
+
+	public DefaultServerInvocation(RpcServerProperties serverProperties) {
+		this.maxConcurrentRequests = serverProperties.getMaxConcurrentRequests();
+		this.semaphore = new Semaphore(this.maxConcurrentRequests);
+	}
 
 	@Override
 	public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {

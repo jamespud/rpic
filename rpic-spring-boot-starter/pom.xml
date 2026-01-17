@@ -16,7 +16,7 @@
     <maven.compiler.target>8</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <micrometer.version>1.9.11</micrometer.version>
-    <resilience4j.version>2.3.0</resilience4j.version>
+    <resilience4j.version>1.7.1</resilience4j.version>
   </properties>
 
   <dependencies>
@@ -35,6 +35,11 @@
       <artifactId>spring-boot-starter</artifactId>
       <version>${spring-boot-version}</version>
       <type>pom</type>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+      <version>${spring-boot-version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
@@ -79,7 +84,7 @@
     <dependency>
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
-      <version>3.2.2</version>
+      <version>2.9.3</version>
     </dependency>
     <!-- Netty native epoll (runtime only, Linux classifiers) -->
     <dependency>
@@ -121,7 +126,14 @@
     <dependency>
       <groupId>io.opentelemetry</groupId>
       <artifactId>opentelemetry-api</artifactId>
-      <version>1.32.0</version>
+      <version>1.12.0</version>
+      <optional>true</optional>
+    </dependency>
+    <!-- OpenTelemetry Semantic Conventions for traces -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-semconv</artifactId>
+      <version>1.12.0-alpha</version>
       <optional>true</optional>
     </dependency>
     <dependency>
