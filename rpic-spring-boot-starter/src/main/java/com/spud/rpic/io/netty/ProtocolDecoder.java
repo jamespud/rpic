@@ -25,7 +25,7 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		}
 
 		// 确保有足够的字节可读
-		if (in.readableBytes() < ProtocolMsg.HEADER_LENGTH) {
+		if (in.readableBytes() < RpcConstants.HEADER_LENGTH) {
 			log.debug("Channel[{}] Not enough bytes for header, waiting for more data. Available: {}",
 				ctx.channel().id().asShortText(), in.readableBytes());
 			return;
@@ -35,7 +35,7 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		in.markReaderIndex();
 
 		// 记录开始解码的位置
-		log.info("Channel[{}] Starting to decode message at position: {}, readable bytes: {}",
+		log.debug("Channel[{}] Starting to decode message at position: {}, readable bytes: {}",
 			ctx.channel().id().asShortText(), in.readerIndex(), in.readableBytes());
 
 		// 读取魔数
@@ -60,7 +60,7 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		byte serializerType = in.readByte();
 
 		// 打印类型信息
-		log.info(
+		log.debug(
 			"Channel[{}] Read message type: {} (hex: 0x{}), serializerType={}, comparing with TYPE_RESPONSE={}",
 			ctx.channel().id().asShortText(), type, Integer.toHexString(type & 0xFF), serializerType,
 			RpcConstants.TYPE_RESPONSE);
@@ -69,7 +69,7 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		int contentLength = in.readInt();
 
 		// 确保长度合理
-		if (contentLength < 0 || contentLength > ProtocolMsg.MAX_FRAME_LENGTH) {
+		if (contentLength < 0 || contentLength > RpcConstants.MAX_FRAME_LENGTH) {
 			in.resetReaderIndex();
 			log.error("Channel[{}] Invalid content length: {}", ctx.channel().id().asShortText(),
 				contentLength);
@@ -91,18 +91,18 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		if (contentLength > 0) {
 			content = new byte[contentLength];
 			in.readBytes(content);
-			log.info("Channel[{}] Read content bytes, length: {}, first few bytes: {}",
+			log.debug("Channel[{}] Read content bytes, length: {}, first few bytes: {}",
 				ctx.channel().id().asShortText(), contentLength,
 				bytesToHex(content, 0, Math.min(20, content.length)));
 		} else {
 			content = new byte[0];
-			log.warn("Channel[{}] Read empty content (length=0)", ctx.channel().id().asShortText());
+			log.debug("Channel[{}] Read empty content (length=0)", ctx.channel().id().asShortText());
 		}
 
 		// 创建消息对象
 		ProtocolMsg protocolMsg = new ProtocolMsg(magicNumber, version, type, serializerType,
 			contentLength, content);
-		log.info(
+		log.debug(
 			"Channel[{}] Decoded ProtocolMsg: magic=0x{}, version={}, type={} (hex: 0x{}), contentLength={}",
 			ctx.channel().id().asShortText(),
 			Integer.toHexString(magicNumber & 0xFF),
@@ -114,12 +114,12 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 		validateMessageType(ctx, protocolMsg);
 
 		// 添加到输出列表
-		log.info("Channel[{}] Adding decoded message to output list: type={}",
+		log.debug("Channel[{}] Adding decoded message to output list: type={}",
 			ctx.channel().id().asShortText(), type);
 		out.add(protocolMsg);
 
 		// 记录读取完成后的位置
-		log.info("Channel[{}] Finished decoding, reader index now at: {}, remaining bytes: {}",
+		log.debug("Channel[{}] Finished decoding, reader index now at: {}, remaining bytes: {}",
 			ctx.channel().id().asShortText(), in.readerIndex(), in.readableBytes());
 	}
 
@@ -157,11 +157,11 @@ public class ProtocolDecoder extends ByteToMessageDecoder {
 				ctx.channel().id().asShortText(), type, Integer.toHexString(type & 0xFF));
 		} else {
 			if (type == RpcConstants.TYPE_RESPONSE) {
-				log.info("Channel[{}] Valid RESPONSE message detected", ctx.channel().id().asShortText());
+				log.debug("Channel[{}] Valid RESPONSE message detected", ctx.channel().id().asShortText());
 			} else if (type == RpcConstants.TYPE_REQUEST) {
-				log.info("Channel[{}] Valid REQUEST message detected", ctx.channel().id().asShortText());
+				log.debug("Channel[{}] Valid REQUEST message detected", ctx.channel().id().asShortText());
 			} else if (type == RpcConstants.TYPE_HEARTBEAT) {
-				log.info("Channel[{}] Valid HEARTBEAT message detected", ctx.channel().id().asShortText());
+				log.debug("Channel[{}] Valid HEARTBEAT message detected", ctx.channel().id().asShortText());
 			}
 		}
 	}

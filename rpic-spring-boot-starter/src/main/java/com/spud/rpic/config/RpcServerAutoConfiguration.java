@@ -40,8 +40,8 @@ public class RpcServerAutoConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public DefaultServerInvocation defaultServerInvocation() {
-		return new DefaultServerInvocation();
+	public DefaultServerInvocation defaultServerInvocation(RpcProperties properties) {
+		return new DefaultServerInvocation(properties.getServer());
 	}
 
 	@Bean
