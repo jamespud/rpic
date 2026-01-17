@@ -87,7 +87,7 @@ public class DefaultClientInvocation implements ClientInvocation {
 				continue;
 			}
 
-			long perAttemptTimeout = Math.min(Math.max(1L, remaining), Integer.MAX_VALUE);
+			long perAttemptTimeout = Math.min(remaining, Integer.MAX_VALUE);
 			request.setDeadlineAtMillis(deadlineAtMillis);
 			request.setAttempt(attempt);
 			request.setTimeout((int) perAttemptTimeout);
