@@ -26,13 +26,11 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
 
 	private final Map<String, Method> methodCache = new ConcurrentHashMap<>();
 
-	private final int maxConcurrentRequests;
-
-	private final Semaphore semaphore;
+  private final Semaphore semaphore;
 
 	public DefaultServerInvocation(RpcServerProperties serverProperties) {
-		this.maxConcurrentRequests = serverProperties.getMaxConcurrentRequests();
-		this.semaphore = new Semaphore(this.maxConcurrentRequests);
+    int maxConcurrentRequests = serverProperties.getMaxConcurrentRequests();
+		this.semaphore = new Semaphore(maxConcurrentRequests);
 	}
 
 	@Override
@@ -80,6 +78,7 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
 			});
 			Object result = method.invoke(serviceBean, request.getParameters());
 			response.setResult(result);
+			response.setError(false); // 只有成功时才设置为 false
 		} catch (IllegalAccessException e) {
 			response.setError(true);
 			response.setErrorMsg("Method access error: " + e.getMessage());
@@ -97,7 +96,6 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
 			response.setErrorMsg("Internal server error: " + e.getMessage());
 			log.error("Internal server error", e);
 		}
-		response.setError(false);
 		return response;
 	}
 
