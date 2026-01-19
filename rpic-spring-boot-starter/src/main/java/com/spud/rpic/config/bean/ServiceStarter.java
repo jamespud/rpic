@@ -131,7 +131,7 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 			scanParameterReferences(context, consumers);
 
 			if (!consumers.isEmpty()) {
-				registry.subscribe(consumers, new DefaultServiceChangeListener());
+				registry.subscribe(consumers, new DefaultServiceChangeListener(registry));
 				log.info("Subscribed to {} RPC services", consumers.size());
 			}
 		} catch (Exception e) {
