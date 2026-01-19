@@ -114,6 +114,17 @@ public class RpcClientAutoConfiguration implements DisposableBean {
 		return new ServiceStarter(registry, rpcProperties);
 	}
 
+
+	@Bean
+	@ConditionalOnMissingBean
+	public SerializerFactory serializerFactory(RpcProperties properties) {
+		String whitelist = properties.getClient().getHessianWhitelist();
+		if (whitelist != null && !whitelist.isEmpty()) {
+			System.setProperty("rpic.hessian.whitelist", whitelist);
+		}
+		return new SerializerFactory();
+	}
+
 	@Override
 	public void destroy() throws Exception {
 

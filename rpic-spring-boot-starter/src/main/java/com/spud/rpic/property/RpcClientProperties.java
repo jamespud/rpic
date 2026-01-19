@@ -224,4 +224,10 @@ public class RpcClientProperties {
 		@Positive(message = "Probe interval must be positive")
 		private long probeIntervalMs = 5_000L;
 	}
+
+	/**
+	 * Hessian deserialization whitelist (comma-separated prefixes). Default allows JDK and project packages.
+	 */
+	private String hessianWhitelist = "java.,javax.,com.spud.rpic.";
 }
+
