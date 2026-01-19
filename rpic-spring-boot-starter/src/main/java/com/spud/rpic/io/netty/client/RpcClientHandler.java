@@ -201,16 +201,19 @@ public class RpcClientHandler extends SimpleChannelInboundHandler<ProtocolMsg> {
 		}
 
 		log.warn("Failing all pending promises due to: {}", cause.getMessage());
-		pendingRequests.forEach((requestId, pendingRequest) -> {
-			// 取消所有超时任务
+		// Create a snapshot of keys to avoid concurrent modification issues and remove atomically
+		for (String requestId : pendingRequests.keySet().toArray(new String[0])) {
+			PendingRequest pendingRequest = pendingRequests.remove(requestId);
+			if (pendingRequest == null) continue;
 			if (pendingRequest.timeoutFuture != null) {
 				pendingRequest.timeoutFuture.cancel(false);
 			}
-			// 设置所有Promise为失败
-			pendingRequest.promise.tryFailure(
-				new RpcException("Channel exception: " + cause.getMessage(), cause));
-		});
-		pendingRequests.clear();
+			pendingRequest.promise.tryFailure(new RpcException("Channel exception: " + cause.getMessage(), cause));
+		}
+		// pendingRequests should now be empty or contain newly added entries by other threads
+		if (!pendingRequests.isEmpty()) {
+			log.debug("Some pending requests were added while failing promises, remaining count={}", pendingRequests.size());
+		}
 	}
 
 	public void close() {

@@ -159,22 +159,31 @@ public class ServiceURL implements Serializable {
 			.append(port).append("/")
 			.append(interfaceName);
 
+
+		boolean hasParams = false;
 		if (group != null && !group.isEmpty()) {
 			buf.append("?group=").append(group);
+			hasParams = true;
 		}
 		if (version != null && !version.isEmpty()) {
-			buf.append(group == null ? "?" : "&");
+			buf.append(hasParams ? "&" : "?");
 			buf.append("version=").append(version);
+			hasParams = true;
 		}
 
 		if (parameters != null && !parameters.isEmpty()) {
-			parameters.forEach((key, value) -> {
-				if (!"group".equals(key) && !"version".equals(key)) {
-					buf.append(group == null && version == null ? "?" : "&");
-					buf.append(key).append("=").append(value);
+			for (Map.Entry<String, String> e : parameters.entrySet()) {
+				String key = e.getKey();
+				String value = e.getValue();
+				if ("group".equals(key) || "version".equals(key)) {
+					continue;
 				}
-			});
+				buf.append(hasParams ? "&" : "?");
+				buf.append(key).append("=").append(value);
+				hasParams = true;
+			}
 		}
+
 
 		return buf.toString();
 	}
