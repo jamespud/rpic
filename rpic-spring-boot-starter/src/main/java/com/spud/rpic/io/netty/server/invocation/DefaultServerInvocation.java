@@ -66,16 +66,21 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
 			Class<?> interfaceClass = request.getInterfaceClass();
 			Object serviceBean = applicationContext.getBean(interfaceClass);
 			String methodKey = request.getServiceKey();
-			Method method = methodCache.computeIfAbsent(methodKey, k -> {
+			Method method = methodCache.get(methodKey);
+			if (method == null) {
 				try {
-					return serviceBean.getClass().getMethod(
+					method = serviceBean.getClass().getMethod(
 						request.getMethodName(),
 						request.getParameterTypes()
 					);
+					Method existing = methodCache.putIfAbsent(methodKey, method);
+					if (existing != null) {
+						method = existing;
+					}
 				} catch (NoSuchMethodException e) {
 					throw new RpcException("Method not found: " + methodKey, e);
 				}
-			});
+			}
 			Object result = method.invoke(serviceBean, request.getParameters());
 			response.setResult(result);
 			response.setError(false); // 只有成功时才设置为 false
