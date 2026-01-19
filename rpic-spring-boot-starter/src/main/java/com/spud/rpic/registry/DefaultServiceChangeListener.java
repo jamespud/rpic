@@ -32,7 +32,15 @@ public class DefaultServiceChangeListener implements ServiceChangeListener {
 					if (key == null) continue;
 					if (key.startsWith(serviceName + ":") || key.equals(serviceName)) {
 						registry.discoveryCache.invalidate(key);
-						// Optionally preload the new urls for this key if version/group can be inferred.
+					}
+				}
+				// Optionally pre-populate discovery cache entries for the provided ServiceURLs
+				if (newServiceUrls != null && !newServiceUrls.isEmpty()) {
+					for (ServiceURL url : newServiceUrls) {
+						String version = url.getVersion() == null || url.getVersion().isEmpty() ? "default" : url.getVersion();
+						String group = url.getGroup() == null ? "" : url.getGroup();
+						String inferredKey = url.getInterfaceName() + ":" + version + ":" + group;
+						registry.discoveryCache.put(inferredKey, newServiceUrls);
 					}
 				}
 			}

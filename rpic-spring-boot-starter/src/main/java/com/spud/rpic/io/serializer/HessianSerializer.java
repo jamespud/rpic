@@ -42,10 +42,7 @@ public class HessianSerializer implements Serializer {
 				}
 			}
 			if (!allowed) {
-				// still allow if the object is an instance of expected class (tighten by default)
-				if (!clz.isInstance(obj)) {
-					throw new SerializeException("Deserialized class '" + actualClass + "' is not allowed by whitelist and is not assignable to expected " + clz.getName());
-				}
+				throw new SerializeException("Deserialized class '" + actualClass + "' is not allowed by whitelist");
 			}
 			return clz.cast(obj);
 		} catch (SerializeException e) {
