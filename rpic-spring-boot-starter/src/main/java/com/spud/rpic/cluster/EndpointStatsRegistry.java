@@ -70,7 +70,7 @@ public class EndpointStatsRegistry {
 		private final AtomicLong requestCount = new AtomicLong();
 		private final AtomicLong failureCount = new AtomicLong();
 		private volatile long ejectedUntil;
-		private volatile long lastProbeAt;
+		private final AtomicLong lastProbeAt = new AtomicLong(0);
 
 		void recordSuccess(long latencyMs) {
 			requestCount.incrementAndGet();
@@ -88,7 +88,8 @@ public class EndpointStatsRegistry {
 			if (!properties.isEnabled() || requests < properties.getMinRequestVolume()) {
 				return;
 			}
-			double failureRate = failureCount.get() / (double) Math.max(1, requests);
+			long failures = failureCount.get();
+			double failureRate = failures / (double) requests;
 			if (failureRate >= properties.getErrorRateThreshold()) {
 				ejectedUntil = System.currentTimeMillis() + properties.getEjectionDurationMs();
 			}
@@ -101,8 +102,9 @@ public class EndpointStatsRegistry {
 			if (probeIntervalMs <= 0) {
 				return true;
 			}
-			if (lastProbeAt == 0 || now - lastProbeAt >= probeIntervalMs) {
-				lastProbeAt = now;
+			long last = lastProbeAt.get();
+			if (last == 0 || now - last >= probeIntervalMs) {
+				lastProbeAt.set(now);
 				return false;
 			}
 			return true;
