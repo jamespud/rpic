@@ -29,8 +29,16 @@ public class DefaultServerInvocation implements ServerInvocation, ApplicationCon
   private final Semaphore semaphore;
 
 	public DefaultServerInvocation(RpcServerProperties serverProperties) {
-    int maxConcurrentRequests = serverProperties.getMaxConcurrentRequests();
-		this.semaphore = new Semaphore(maxConcurrentRequests);
+		int maxConcurrentRequests = serverProperties.getMaxConcurrentRequests();
+		this.semaphore = new java.util.concurrent.Semaphore(maxConcurrentRequests);
+	}
+
+	/*
+	 * Package-private constructor for testing. Allows injecting a custom Semaphore to avoid
+	 * fragile reflection-based tests. Visible within the package for tests.
+	 */
+	DefaultServerInvocation(RpcServerProperties serverProperties, java.util.concurrent.Semaphore testSemaphore) {
+		this.semaphore = testSemaphore == null ? new java.util.concurrent.Semaphore(serverProperties.getMaxConcurrentRequests()) : testSemaphore;
 	}
 
 	@Override

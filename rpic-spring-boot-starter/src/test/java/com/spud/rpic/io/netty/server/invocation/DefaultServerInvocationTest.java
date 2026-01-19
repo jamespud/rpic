@@ -81,51 +81,61 @@ class DefaultServerInvocationTest {
 
     @Test
     @DisplayName("测试服务端过载")
-    void testHandleRequest_ServerOverload() {
+    void testHandleRequest_ServerOverload() throws InterruptedException {
         // 创建配置属性，设置最大并发请求数为1
         RpcServerProperties serverProperties = new RpcServerProperties();
         serverProperties.setMaxConcurrentRequests(1);
-        serverInvocation = new DefaultServerInvocation(serverProperties);
+
+        // 创建可控的 semaphore 并注入到 DefaultServerInvocation 中，以避免使用反射
+        java.util.concurrent.Semaphore testSemaphore = new java.util.concurrent.Semaphore(1);
+        serverInvocation = new DefaultServerInvocation(serverProperties, testSemaphore);
         serverInvocation.setApplicationContext(mockApplicationContext);
-        when(mockApplicationContext.getBean(MockService.class)).thenReturn(mockService);
+
+        // 使用一个会阻塞的 MockService 实现来模拟长时间处理的请求
+        MockService blockingService = new MockService() {
+            @Override
+            public String sayHello(String name) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return "Hello, " + name + "!";
+            }
+
+            @Override
+            public int add(int a, int b) {
+                return mockService.add(a, b);
+            }
+
+            @Override
+            public void throwException() throws Exception {
+                mockService.throwException();
+            }
+        };
+
+        when(mockApplicationContext.getBean(MockService.class)).thenReturn(blockingService);
 
         // 创建两个 RPC 请求
         RpcRequest request1 = createMockRequest(MockService.class, "sayHello", new Class[]{String.class}, "World1");
         RpcRequest request2 = createMockRequest(MockService.class, "sayHello", new Class[]{String.class}, "World2");
 
-        // 第一个请求应该成功
-        RpcResponse response1 = serverInvocation.handleRequest(request1);
-        assertFalse(response1.getError());
+        // 在单独线程中发起第一个请求，使其在处理期间占用 semaphore
+        Thread t = new Thread(() -> {
+            RpcResponse resp = serverInvocation.handleRequest(request1);
+            assertFalse(resp.getError());
+        });
+        t.start();
 
-        // 第二个请求应该由于服务器过载而失败
-        // 由于 semaphore.release() 在 finally 块中，第一个请求完成后会释放信号量
-        // 所以我们需要在第一个请求处理过程中发送第二个请求，模拟并发场景
-        // 但由于测试是同步的，我们需要使用反射来直接操作 semaphore
+        // 确保第一个请求已开始并占用信号量
+        Thread.sleep(50);
 
-        try {
-            // 使用反射获取 semaphore 并强制 acquire，模拟服务器繁忙
-            java.lang.reflect.Field semaphoreField = DefaultServerInvocation.class.getDeclaredField("semaphore");
-            semaphoreField.setAccessible(true);
-            java.util.concurrent.Semaphore semaphore = (java.util.concurrent.Semaphore) semaphoreField.get(serverInvocation);
-            semaphore.acquire(); // 此时已使用完所有信号量
+        // 此时第二个请求应被认为服务器过载
+        RpcResponse response2 = serverInvocation.handleRequest(request2);
+        assertTrue(response2.getError());
+        assertTrue(response2.getErrorMsg().contains("Server is overloaded"));
 
-            RpcResponse response2 = serverInvocation.handleRequest(request2);
-            assertTrue(response2.getError());
-            assertTrue(response2.getErrorMsg().contains("Server is overloaded"));
-        } catch (Exception e) {
-            fail("测试过程中发生异常: " + e.getMessage());
-        } finally {
-            try {
-                java.lang.reflect.Field semaphoreField = DefaultServerInvocation.class.getDeclaredField("semaphore");
-                semaphoreField.setAccessible(true);
-                java.util.concurrent.Semaphore semaphore = (java.util.concurrent.Semaphore) semaphoreField.get(serverInvocation);
-                while (semaphore.availablePermits() < 1) {
-                    semaphore.release();
-                }
-            } catch (Exception e) {
-                // 忽略异常
-            }
-        }
+        t.join();
     }
 
     @Test
