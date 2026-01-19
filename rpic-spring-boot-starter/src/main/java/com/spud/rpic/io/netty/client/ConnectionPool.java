@@ -157,16 +157,16 @@ public class ConnectionPool {
 		try {
 			Channel channel = pool.acquire().get(acquireTimeout, TimeUnit.MILLISECONDS);
 
-			// 记录连接数
-			AtomicInteger counter = connectionCounter.computeIfAbsent(address, k -> new AtomicInteger(0));
-			counter.incrementAndGet();
 
 			if (!channel.isActive()) {
 				pool.release(channel);
-				counter.decrementAndGet();
 				recordPoolAcquireFailure(address);
 				throw new RpcException("Channel is not active");
 			}
+
+			// 记录连接数（仅在确认 channel 活跃后）
+			AtomicInteger counter = connectionCounter.computeIfAbsent(address, k -> new AtomicInteger(0));
+			counter.incrementAndGet();
 
 			recordPoolAcquireSuccess(address);
 			log.debug("Successfully acquired channel for address: {}, channel: {}", address, channel);
