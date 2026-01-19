@@ -28,9 +28,15 @@ public class NettyNetServer implements InitializingBean, DisposableBean {
 	private final NioEventLoopGroup bossGroup;
 	private final NioEventLoopGroup workerGroup;
 	private final AtomicBoolean started = new AtomicBoolean(false);
+	private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 	private final CountDownLatch startLatch = new CountDownLatch(1);
 	private volatile Channel serverChannel;
 	private static final Object lock = new Object();
+
+	private void ensureShutdownGuardReset() {
+		// helper to reset shuttingDown state if needed (used during tests or restart scenarios)
+		shuttingDown.set(false);
+	}
 
 	public NettyNetServer(RpcProperties properties, RpcServerInitializer initializer) {
 		this.port = properties.getServer().getPort();
@@ -103,12 +109,13 @@ public class NettyNetServer implements InitializingBean, DisposableBean {
 	}
 
 	public void shutdown() {
-		if (!started.get()) {
+		// prevent re-entrant/recursive shutdown
+		if (!started.get() || !shuttingDown.compareAndSet(false, true)) {
 			return;
 		}
 
 		try {
-			// 关闭服务器channel
+			// 关闭服务器channel（非阻塞）
 			if (serverChannel != null) {
 				serverChannel.close().addListener(future -> {
 					if (future.isSuccess()) {
@@ -136,6 +143,9 @@ public class NettyNetServer implements InitializingBean, DisposableBean {
 		} catch (Exception e) {
 			log.error("Error occurred while shutting down RPC server", e);
 			throw new RuntimeException("Failed to shutdown RPC server", e);
+		} finally {
+			// allow future restarts to attempt shutdown again
+			shuttingDown.set(false);
 		}
 	}
 
