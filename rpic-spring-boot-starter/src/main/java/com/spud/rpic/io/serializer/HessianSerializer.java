@@ -24,11 +24,19 @@ public class HessianSerializer implements Serializer {
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
 	public <T> T deserialize(byte[] data, Class<T> clz) throws SerializeException {
 		try (ByteArrayInputStream bis = new ByteArrayInputStream(data)) {
 			HessianInput hessianInput = new HessianInput(bis);
-			return (T) hessianInput.readObject(clz);
+			Object obj = hessianInput.readObject();
+			if (obj == null) {
+				return null;
+			}
+			if (!clz.isInstance(obj)) {
+				throw new SerializeException("Deserialized object type mismatch. Expected: " + clz.getName() + ", but got: " + obj.getClass().getName());
+			}
+			return clz.cast(obj);
+		} catch (SerializeException e) {
+			throw e; // rethrow our own exceptions
 		} catch (Exception e) {
 			throw new SerializeException("Error deserializing object", e);
 		}
