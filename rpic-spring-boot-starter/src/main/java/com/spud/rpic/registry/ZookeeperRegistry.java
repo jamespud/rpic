@@ -381,15 +381,21 @@ public class ZookeeperRegistry extends Registry {
 			return null;
 		}
 
+		final int previewMax = 200;
+		String json = null;
 		try {
-			String json = new String(data, StandardCharsets.UTF_8);
+			json = new String(data, StandardCharsets.UTF_8);
 			ServiceURL serviceURL = JacksonUtils.toObj(json, ServiceURL.class);
 			if (serviceURL == null) {
-				throw new RuntimeException("Failed to deserialize from JSON: " + json);
+				String preview = json.length() > previewMax ? json.substring(0, previewMax) + "..." : json;
+				throw new RuntimeException("Failed to deserialize to ServiceURL from JSON preview: " + preview);
 			}
 			return serviceURL;
 		} catch (Exception e) {
-			log.error("Deserialization error: {}", new String(data, StandardCharsets.UTF_8), e);
+			int len = data.length;
+			int hash = java.util.Arrays.hashCode(data);
+			String preview = json == null ? "" : (json.length() > previewMax ? json.substring(0, previewMax) + "..." : json);
+			log.error("Deserialization error: dataLen={}, dataHash={}, jsonPreview={}", len, hash, preview, e);
 			throw new RuntimeException("Failed to deserialize metadata", e);
 		}
 	}
