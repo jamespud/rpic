@@ -219,9 +219,10 @@ public class ServiceStarter implements ApplicationListener<ContextRefreshedEvent
 			new Thread(() -> {
 				try {
 					nettyNetServer.start();
-					latch.countDown();
 				} catch (Exception e) {
 					log.error("Failed to start Netty server", e);
+				} finally {
+					latch.countDown();
 				}
 			}, "netty-rpc-server").start();
 
