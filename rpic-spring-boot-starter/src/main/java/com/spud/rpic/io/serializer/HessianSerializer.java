@@ -31,8 +31,21 @@ public class HessianSerializer implements Serializer {
 			if (obj == null) {
 				return null;
 			}
-			if (!clz.isInstance(obj)) {
-				throw new SerializeException("Deserialized object type mismatch. Expected: " + clz.getName() + ", but got: " + obj.getClass().getName());
+			// Basic allowlist: allow classes from java.*, javax.*, and project packages by default.
+			String allowedPrefixes = System.getProperty("rpic.hessian.whitelist", "java.,javax.,com.spud.rpic.");
+			boolean allowed = false;
+			String actualClass = obj.getClass().getName();
+			for (String prefix : allowedPrefixes.split(",")) {
+				if (actualClass.startsWith(prefix.trim())) {
+					allowed = true;
+					break;
+				}
+			}
+			if (!allowed) {
+				// still allow if the object is an instance of expected class (tighten by default)
+				if (!clz.isInstance(obj)) {
+					throw new SerializeException("Deserialized class '" + actualClass + "' is not allowed by whitelist and is not assignable to expected " + clz.getName());
+				}
 			}
 			return clz.cast(obj);
 		} catch (SerializeException e) {
