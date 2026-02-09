@@ -20,6 +20,6 @@
     <netty-version>4.2.6.Final</netty-version>
     <cglib-version>3.3.0</cglib-version>
     <zookeeper-version>3.9.2</zookeeper-version>
-    <spring-boot-version>2.7.10</spring-boot-version>
+    <spring-boot-version>4.0.2</spring-boot-version>
   </properties>
 </project>
