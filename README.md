@@ -30,7 +30,7 @@ RPIC 是一个基于 Spring Boot 和 Netty 构建的高性能 RPC（远程过程
 #### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-username/rpic.git
+git clone https://github.com/jamespud/rpic.git
 cd rpic
 ```
 
